@@ -1,0 +1,20 @@
+version: "3.8"
+
+services:
+  pgvector-db:
+    image: pgvector/pgvector:pg15-trixie
+    environment:
+      - POSTGRES_DB=${POSTGRES_DATABASE}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5431:5432"
+    restart: always
+
+volumes:
+  pgvector-db_data:
+    driver: local
+  postgres_data:
+    driver: local
