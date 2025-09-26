@@ -21,9 +21,9 @@ steps:
   - '$PROJECT_ID:${_REGION}:${_DB_INSTANCE_NAME}'
   # ตั้งค่า Environment Variables
   - '--update-env-vars'
-  - 'DATABASE_URL=postgresql://${_DB_USER}:${_DB_PASS}@/${_DB_NAME}?host=/cloudsql/$PROJECT_ID:${_REGION}:${_DB_INSTANCE_NAME}'
+  - 'POSTGRES_HOST=${_DB_HOST},POSTGRES_PORT=5432,POSTGRES_DATABASE=${_DB_NAME},POSTGRES_USER=${_DB_USER}'
+  - '--update-secrets=POSTGRES_PASSWORD=${DB_PASSWORD}:latest'
   - '--allow-unauthenticated' # ทำให้เข้าถึงได้จากภายนอก
-
 options:
   logging: CLOUD_LOGGING_ONLY
 
@@ -36,6 +36,7 @@ substitutions:
   _SERVICE_NAME: 'time-estimation-service' # เปลี่ยนเป็นชื่อบริการของคุณ
   _REGION: 'asia-southeast1' # เปลี่ยนเป็น Region ที่คุณใช้
   _DB_INSTANCE_NAME: 'your-sql-instance-name' # ใส่ชื่อ Cloud SQL Instance ของคุณ
+  _DB_HOST: '' # ใส่ชื่อ Cloud SQL Instance ของคุณ
   _DB_USER: 'nextjsuser'
   _DB_PASS: '' # จะใส่เป็น Secret Manager ในขั้นตอนถัดไป
   _DB_NAME: 'time-estimation-dev'
