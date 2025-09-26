@@ -1,34 +1,35 @@
 steps:
 # 1. Build the container image
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['build', '-t', 'asia-southeast1-docker.pkg.dev/$PROJECT_ID/estimate-it/${_SERVICE_NAME}:$SHORT_SHA', '.']
+  args: ['build', '-t', 'asia-southeast1-docker.pkg.dev/${_PROJECT_ID}/estimate-it/${_SERVICE_NAME}:$SHORT_SHA', '.']
 
 # 2. Push the container image to Artifact Registry
 - name: 'gcr.io/cloud-builders/docker'
-  args: ['push', 'asia-southeast1-docker.pkg.dev/$PROJECT_ID/estimate-it/${_SERVICE_NAME}:$SHORT_SHA']
+  args: ['push', 'asia-southeast1-docker.pkg.dev/${_PROJECT_ID}/estimate-it/${_SERVICE_NAME}:$SHORT_SHA']
 
 # 3. Deploy container image to Cloud Run
 - name: 'gcr.io/google-appengine/exec-wrapper'
   args:
   - '-i'
-  - 'asia-southeast1-docker.pkg.dev/$PROJECT_ID/estimate-it/${_SERVICE_NAME}:$SHORT_SHA'
+  - 'asia-southeast1-docker.pkg.dev/${_PROJECT_ID}/estimate-it/${_SERVICE_NAME}:$SHORT_SHA'
   - '-s'
   - '${_SERVICE_NAME}'
   - '-r'
   - '${_REGION}'
   # เชื่อมต่อกับ Cloud SQL Instance
   - '--add-cloudsql-instances'
-  - '$PROJECT_ID:${_REGION}:${_DB_INSTANCE_NAME}'
+  - '${_PROJECT_ID}:${_REGION}:${_DB_INSTANCE_NAME}'
   - '--allow-unauthenticated' # ทำให้เข้าถึงได้จากภายนอก
 options:
   logging: CLOUD_LOGGING_ONLY
 
 # Store the image in Artifact Registry
 images:
-- 'asia-southeast1-docker.pkg.dev/$PROJECT_ID/estimate-it/${_SERVICE_NAME}:$SHORT_SHA'
+- 'asia-southeast1-docker.pkg.dev/${_PROJECT_ID}/estimate-it/${_SERVICE_NAME}:$SHORT_SHA'
 
 # ตัวแปรที่สามารถกำหนดค่าได้ตอนสร้าง Trigger
 substitutions:
+  _PROJECT_ID: 'cpmatch-project' # เปลี่ยนเป็น Project ID ของคุณ
   _SERVICE_NAME: 'time-estimation-service' # เปลี่ยนเป็นชื่อบริการของคุณ
   _REGION: 'asia-southeast1' # เปลี่ยนเป็น Region ที่คุณใช้
-  _DB_INSTANCE_NAME: 'cpmatch-project:asia-southeast1:jeurboy-db' # ใส่ชื่อ Cloud SQL Instance ของคุณ
+  _DB_INSTANCE_NAME: 'jeurboy-db' # ใส่ชื่อ Cloud SQL Instance ของคุณ
