@@ -105,11 +105,12 @@ export const useHistoryPage = () => {
         const newRecord: EstimationHistory = {
             id: '', // No ID for a new record,
             project_id: null,
+            source_project_id: null, // Manually created references have no source project
             function_name: '', // This will be filled in by the form
             feature_description: '',
             system_prompt: DEFAULT_SYSTEM_PROMPT, // Use a default prompt
             sub_tasks: [],
-            cost: 0,
+            cost: '0',
             is_reference: true,
             created_at: new Date(),
             description_vector: [],
@@ -166,7 +167,7 @@ export const useHistoryPage = () => {
                         systemPrompt: record.system_prompt,
                         subTasks: record.sub_tasks,
                         isReference: true,
-                        cost: parseFloat(String(record.cost)),
+                        cost: String(record.cost),
                     }),
                 });
             } else {
@@ -177,7 +178,7 @@ export const useHistoryPage = () => {
                         functionName: record.function_name,
                         featureDescription: record.feature_description,
                         subTasks: record.sub_tasks,
-                        cost: parseFloat(String(record.cost)),
+                        cost: String(record.cost),
                     }),
                 });
             }

@@ -110,12 +110,6 @@ export default function ResultsTable({ subTasks, cost, onSubTasksChange }: Resul
         edit({ ...newTask, 'Sub-Task': newKey }); // Put the new row into edit mode
     };
 
-    // Add a unique key for each row for React's rendering
-    const dataSource = subTasks.map((task, index) => ({
-        ...task,
-        key: task['Sub-Task'] || `task-${index}`, // Use Sub-Task as key, with a fallback
-    }));
-
     const columns: EditableColumnType[] = [
         {
             title: 'Sub-Task',
@@ -188,7 +182,8 @@ export default function ResultsTable({ subTasks, cost, onSubTasksChange }: Resul
                         },
                     }}
                     columns={mergedColumns}
-                    dataSource={dataSource}
+                    dataSource={subTasks}
+                    rowKey="Sub-Task"
                     pagination={false}
                     bordered={true}
                 />

@@ -323,7 +323,8 @@ const HistoryPage = () => {
                                         }),
                                     };
                                 })}
-                                dataSource={selectedRecord.sub_tasks.map((t, i) => ({ ...t, key: t['Sub-Task'] || `task-${i}` }))}
+                                dataSource={selectedRecord.sub_tasks}
+                                rowKey={(record) => record.key || record['Sub-Task']}
                                 pagination={false}
                                 size="small"
                                 bordered

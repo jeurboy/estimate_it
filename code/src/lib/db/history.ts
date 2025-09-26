@@ -1,35 +1,9 @@
-import postgres from 'postgres';
-import pgvector from 'pgvector';
-import { URL } from 'url';
-import { EstimationHistory } from './schema';
+import { db } from './index';
+import { estimation_history as estimationHistory, EstimationHistory } from './schema';
+
 import { SubTask } from '@/lib/services/geminiService';
-
-const POSTGRES_URL = process.env.POSTGRES_URL;
-
-if (!POSTGRES_URL) {
-    throw new Error("POSTGRES_URL environment variable not set.");
-}
-
-// The `postgres` library can error on unrecognized connection string parameters.
-// Some providers might add a `schema` parameter, which is not standard.
-// We'll parse the URL, map `schema` to the correct `search_path` parameter,
-// and remove it from the URL string to avoid the error.
-const url = new URL(POSTGRES_URL);
-
-interface CustomOptions extends postgres.Options<{}> {
-    search_path?: string;
-}
-
-const options: CustomOptions = {};
-
-if (url.searchParams.has('schema')) {
-    options.search_path = url.searchParams.get('schema')!;
-    url.searchParams.delete('schema');
-}
-
-const connectionString = url.toString();
-// The `postgres` library provides connection pooling by default.
-const sql = postgres(connectionString, options);
+import { sql, eq, ilike, and, asc, desc } from 'drizzle-orm';
+import pgvector from 'pgvector/pg';
 
 export interface SaveEstimationData {
     projectId: string | null;
@@ -39,7 +13,7 @@ export interface SaveEstimationData {
     systemPrompt: string;
     subTasks: SubTask[]; // JSONB
     isReference: boolean;
-    cost: number;
+    cost: string;
     descriptionVector: number[];
 }
 
@@ -51,22 +25,18 @@ export interface SaveEstimationData {
 export async function saveEstimation(data: SaveEstimationData): Promise<EstimationHistory> {
     console.log("Saving estimation with data:", data);
     try {
-        const [savedRecord] = await sql<EstimationHistory[]>`
-            INSERT INTO estimation_history (
-                project_id, source_project_id, function_name, feature_description, system_prompt, is_reference, sub_tasks, cost, description_vector
-            ) VALUES (
-                ${data.projectId},
-                ${data.sourceProjectId},
-                ${data.functionName},
-                ${data.featureDescription},
-                ${data.systemPrompt},
-                ${data.isReference},
-                ${sql.json(data.subTasks as any)},
-                ${data.cost},
-                ${pgvector.toSql(data.descriptionVector)}
-            )
-            RETURNING *;
-        `;
+        const [savedRecord] = await db.insert(estimationHistory).values({
+            project_id: data.projectId,
+            source_project_id: data.sourceProjectId,
+            function_name: data.functionName,
+            feature_description: data.featureDescription,
+            system_prompt: data.systemPrompt,
+            is_reference: data.isReference,
+            sub_tasks: data.subTasks,
+            cost: data.cost,
+            // Drizzle pgvector handles the conversion automatically
+            description_vector: data.descriptionVector,
+        }).returning();
         return savedRecord;
     } catch (error) {
         console.error("Database error in saveEstimation:", error);
@@ -81,16 +51,11 @@ export async function saveEstimation(data: SaveEstimationData): Promise<Estimati
  */
 export async function listEstimations(searchTerm?: string): Promise<EstimationHistory[]> {
     try {
+        const query = db.select().from(estimationHistory).orderBy(desc(estimationHistory.created_at));
         if (searchTerm) {
-            return await sql<EstimationHistory[]>`
-                SELECT * FROM estimation_history
-                WHERE function_name ILIKE ${'%' + searchTerm + '%'}
-                ORDER BY created_at DESC;
-            `;
+            query.where(ilike(estimationHistory.function_name, `%${searchTerm}%`));
         }
-        return await sql<EstimationHistory[]>`
-            SELECT * FROM estimation_history ORDER BY created_at DESC;
-        `;
+        return await query;
     } catch (error) {
         console.error("Database error in listEstimations:", error);
         throw new Error("Failed to retrieve estimations from the database.");
@@ -105,12 +70,11 @@ export async function listEstimations(searchTerm?: string): Promise<EstimationHi
  */
 export async function findSimilarEstimations(embedding: number[]): Promise<EstimationHistory[]> {
     try {
-        return await sql<EstimationHistory[]>`
-            SELECT * FROM estimation_history
-            WHERE is_reference = TRUE -- Only search against reference estimations
-            ORDER BY description_vector <=> ${pgvector.toSql(embedding)}
-            LIMIT 3;
-        `;
+        return await db.select()
+            .from(estimationHistory)
+            .where(and(eq(estimationHistory.is_reference, true)))
+            .orderBy(sql`description_vector <=> ${pgvector.toSql(embedding)}`)
+            .limit(3);
     } catch (error) {
         console.error("Database error in findSimilarEstimations:", error);
         throw new Error("Failed to find similar estimations in the database.");
@@ -132,16 +96,12 @@ export interface UpdateEstimationData {
  */
 export async function updateEstimation(data: UpdateEstimationData): Promise<EstimationHistory> {
     try {
-        const [updatedRecord] = await sql<EstimationHistory[]>`
-            UPDATE estimation_history
-            SET
-                function_name = ${data.functionName},
-                feature_description = ${data.featureDescription},
-                sub_tasks = ${sql.json(data.subTasks as any)},
-                cost = ${data.cost}
-            WHERE id = ${data.id}
-            RETURNING *;
-        `;
+        const [updatedRecord] = await db.update(estimationHistory).set({
+            function_name: data.functionName,
+            feature_description: data.featureDescription,
+            sub_tasks: data.subTasks,
+            cost: String(data.cost),
+        }).where(eq(estimationHistory.id, data.id)).returning();
         if (!updatedRecord) {
             throw new Error("Record not found for update.");
         }
@@ -159,15 +119,8 @@ export async function updateEstimation(data: UpdateEstimationData): Promise<Esti
  */
 export async function deleteEstimation(id: string): Promise<EstimationHistory | null> {
     try {
-        const result = await sql<EstimationHistory[]>`
-            DELETE FROM estimation_history
-            WHERE id = ${id}
-            RETURNING *;
-        `;
-        if (result.count === 0) {
-            return null;
-        }
-        return result[0];
+        const result = await db.delete(estimationHistory).where(eq(estimationHistory.id, id)).returning();
+        return result.length > 0 ? result[0] : null;
     } catch (error) {
         console.error("Database error in deleteEstimation:", error);
         throw new Error("Failed to delete estimation from the database.");

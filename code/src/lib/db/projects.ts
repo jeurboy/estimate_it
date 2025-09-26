@@ -1,32 +1,6 @@
-import postgres from 'postgres';
-import { URL } from 'url';
-import { Project } from './schema';
-
-const POSTGRES_URL = process.env.POSTGRES_URL;
-
-if (!POSTGRES_URL) {
-    throw new Error("POSTGRES_URL environment variable not set.");
-}
-
-// The `postgres` library can error on unrecognized connection string parameters.
-// Some providers might add a `schema` parameter, which is not standard.
-// We'll parse the URL, map `schema` to the correct `search_path` parameter,
-// and remove it from the URL string to avoid the error.
-const url = new URL(POSTGRES_URL);
-
-interface CustomOptions extends postgres.Options<{}> {
-    search_path?: string;
-}
-
-const options: CustomOptions = {};
-
-if (url.searchParams.has('schema')) {
-    options.search_path = url.searchParams.get('schema')!;
-    url.searchParams.delete('schema');
-}
-
-const connectionString = url.toString();
-const sql = postgres(connectionString, options);
+import { db } from './index';
+import { projects, Project } from './schema';
+import { eq, desc } from 'drizzle-orm';
 
 export interface ProjectData {
     name_th: string;
@@ -41,9 +15,7 @@ export interface ProjectData {
  */
 export async function listProjects(): Promise<Project[]> {
     try {
-        return await sql<Project[]>`
-            SELECT * FROM projects ORDER BY created_at DESC;
-        `;
+        return await db.select().from(projects).orderBy(desc(projects.created_at));
     } catch (error) {
         console.error("Database error in listProjects:", error);
         throw new Error("Failed to retrieve projects from the database.");
@@ -57,11 +29,12 @@ export async function listProjects(): Promise<Project[]> {
  */
 export async function createProject(data: ProjectData): Promise<Project> {
     try {
-        const [project] = await sql<Project[]>`
-            INSERT INTO projects (name_th, name_en, description, duration_months)
-            VALUES (${data.name_th}, ${data.name_en}, ${data.description}, ${data.duration_months})
-            RETURNING *;
-        `;
+        const [project] = await db.insert(projects).values({
+            name_th: data.name_th,
+            name_en: data.name_en,
+            description: data.description,
+            duration_months: data.duration_months,
+        }).returning();
         return project;
     } catch (error) {
         console.error("Database error in createProject:", error);
@@ -77,16 +50,13 @@ export async function createProject(data: ProjectData): Promise<Project> {
  */
 export async function updateProject(id: string, data: ProjectData): Promise<Project> {
     try {
-        const [project] = await sql<Project[]>`
-            UPDATE projects
-            SET name_th = ${data.name_th},
-                name_en = ${data.name_en},
-                description = ${data.description},
-                duration_months = ${data.duration_months},
-                updated_at = NOW()
-            WHERE id = ${id}
-            RETURNING *;
-        `;
+        const [project] = await db.update(projects).set({
+            name_th: data.name_th,
+            name_en: data.name_en,
+            description: data.description,
+            duration_months: data.duration_months,
+            updated_at: new Date(),
+        }).where(eq(projects.id, id)).returning();
         if (!project) {
             throw new Error("Project not found for update.");
         }
@@ -104,15 +74,8 @@ export async function updateProject(id: string, data: ProjectData): Promise<Proj
  */
 export async function deleteProject(id: string): Promise<Project | null> {
     try {
-        const result = await sql<Project[]>`
-            DELETE FROM projects
-            WHERE id = ${id}
-            RETURNING *;
-        `;
-        if (result.count === 0) {
-            return null;
-        }
-        return result[0];
+        const result = await db.delete(projects).where(eq(projects.id, id)).returning();
+        return result.length > 0 ? result[0] : null;
     } catch (error) {
         console.error("Database error in deleteProject:", error);
         throw new Error("Failed to delete project from the database.");

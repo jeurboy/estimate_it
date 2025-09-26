@@ -87,21 +87,23 @@ export default function useEstimationPage() {
         addMessage('status', 'Starting estimation process...');
 
         try {
-            // --- T011: Find similar projects and enhance the prompt ---
-            addMessage('status', 'Fetching all reference tasks...');
+            // --- Find similar tasks and enhance the prompt ---
+            addMessage('status', 'Finding similar reference tasks...');
             let finalSystemPrompt = systemPrompt; // Start with the base prompt
 
             try {
-                // Instead of finding similar, fetch all history and filter for references
-                const historyRes = await fetch('/api/history');
+                const similarRes = await fetch('/api/find-similar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ featureDescription: taskDescription }),
+                });
 
-                if (historyRes.ok) {
-                    const { history } = await historyRes.json();
-                    const referenceProjects = history.filter((item: EstimationHistory) => item.is_reference);
+                if (similarRes.ok) {
+                    const { similarTasks } = await similarRes.json();
 
-                    if (referenceProjects && referenceProjects.length > 0) {
-                        addMessage('status', `Found ${referenceProjects.length} reference task(s). Using them as examples.`);
-                        const examplesText = formatExamplesForPrompt(referenceProjects);
+                    if (similarTasks && similarTasks.length > 0) {
+                        addMessage('status', `Found ${similarTasks.length} similar task(s). Using them as examples.`);
+                        const examplesText = formatExamplesForPrompt(similarTasks);
                         finalSystemPrompt += examplesText;
                     } else {
                         addMessage('status', 'No reference tasks found. Proceeding with standard estimation.');

@@ -1,35 +1,17 @@
-import postgres from 'postgres';
-import { URL } from 'url';
-import { UserStory } from './schema';
-
-const POSTGRES_URL = process.env.POSTGRES_URL;
-
-if (!POSTGRES_URL) {
-    throw new Error("POSTGRES_URL environment variable not set.");
-}
-
-const url = new URL(POSTGRES_URL);
-interface CustomOptions extends postgres.Options<{}> {
-    search_path?: string;
-}
-const options: CustomOptions = {};
-if (url.searchParams.has('schema')) {
-    options.search_path = url.searchParams.get('schema')!;
-    url.searchParams.delete('schema');
-}
-const connectionString = url.toString();
-const sql = postgres(connectionString, options);
+import { db } from './index';
+import { user_stories as userStories, UserStory } from './schema';
+import { eq, desc, and } from 'drizzle-orm';
 
 /**
  * Creates a new user story for a given project.
  */
 export async function createUserStory(projectId: string, storyText: string, featureName: string): Promise<UserStory> {
     try {
-        const [story] = await sql<UserStory[]>`
-            INSERT INTO user_stories (project_id, story_text, feature_name)
-            VALUES (${projectId}, ${storyText}, ${featureName})
-            RETURNING *;
-        `;
+        const [story] = await db.insert(userStories).values({
+            project_id: projectId,
+            story_text: storyText,
+            feature_name: featureName,
+        }).returning();
         return story;
     } catch (error) {
         console.error("Database error in createUserStory:", error);
@@ -42,11 +24,10 @@ export async function createUserStory(projectId: string, storyText: string, feat
  */
 export async function listUserStoriesByProject(projectId: string): Promise<UserStory[]> {
     try {
-        return await sql<UserStory[]>`
-            SELECT * FROM user_stories
-            WHERE project_id = ${projectId}
-            ORDER BY created_at DESC;
-        `;
+        return await db.select()
+            .from(userStories)
+            .where(eq(userStories.project_id, projectId))
+            .orderBy(desc(userStories.created_at));
     } catch (error) {
         console.error("Database error in listUserStoriesByProject:", error);
         throw new Error("Failed to retrieve user stories from the database.");
@@ -61,12 +42,9 @@ export async function listUserStoriesByProject(projectId: string): Promise<UserS
  */
 export async function updateUserStory(id: string, storyText: string): Promise<UserStory> {
     try {
-        const [story] = await sql<UserStory[]>`
-            UPDATE user_stories
-            SET story_text = ${storyText}
-            WHERE id = ${id}
-            RETURNING *;
-        `;
+        const [story] = await db.update(userStories)
+            .set({ story_text: storyText })
+            .where(eq(userStories.id, id)).returning();
         if (!story) {
             throw new Error("User story not found for update.");
         }
@@ -84,15 +62,8 @@ export async function updateUserStory(id: string, storyText: string): Promise<Us
  */
 export async function deleteUserStory(id: string): Promise<UserStory | null> {
     try {
-        const result = await sql<UserStory[]>`
-            DELETE FROM user_stories
-            WHERE id = ${id}
-            RETURNING *;
-        `;
-        if (result.count === 0) {
-            return null;
-        }
-        return result[0];
+        const result = await db.delete(userStories).where(eq(userStories.id, id)).returning();
+        return result.length > 0 ? result[0] : null;
     } catch (error) {
         console.error("Database error in deleteUserStory:", error);
         throw new Error("Failed to delete user story from the database.");
