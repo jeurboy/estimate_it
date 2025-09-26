@@ -24,6 +24,9 @@ steps:
   - 'DATABASE_URL=postgresql://${_DB_USER}:${_DB_PASS}@/${_DB_NAME}?host=/cloudsql/$PROJECT_ID:${_REGION}:${_DB_INSTANCE_NAME}'
   - '--allow-unauthenticated' # ทำให้เข้าถึงได้จากภายนอก
 
+options:
+  logging: CLOUD_LOGGING_ONLY
+
 # Store the image in Artifact Registry
 images:
 - 'asia-southeast1-docker.pkg.dev/$PROJECT_ID/estimate_it/${_SERVICE_NAME}:$SHORT_SHA'
