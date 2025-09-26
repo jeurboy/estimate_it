@@ -8,18 +8,19 @@ steps:
   args: ['push', 'asia-southeast1-docker.pkg.dev/${_PROJECT_ID}/estimate-it/${_SERVICE_NAME}:$SHORT_SHA']
 
 # 3. Deploy container image to Cloud Run
-- name: 'gcr.io/google-appengine/exec-wrapper'
+- name: 'gcr.io/cloud-builders/gcloud'
   args:
-  - '-i'
-  - 'asia-southeast1-docker.pkg.dev/${_PROJECT_ID}/estimate-it/${_SERVICE_NAME}:$SHORT_SHA'
-  - '-s'
+  - 'run'
+  - 'deploy'
   - '${_SERVICE_NAME}'
-  - '-r'
+  - '--image'
+  - 'asia-southeast1-docker.pkg.dev/${_PROJECT_ID}/estimate-it/${_SERVICE_NAME}:$SHORT_SHA'
+  - '--region'
   - '${_REGION}'
-  # เชื่อมต่อกับ Cloud SQL Instance
-  - '--add-cloudsql-instances'
-  - '${_PROJECT_ID}:${_REGION}:${_DB_INSTANCE_NAME}'
-  - '--allow-unauthenticated' # ทำให้เข้าถึงได้จากภายนอก
+  - '--platform'
+  - 'managed'
+  - '--add-cloudsql-instances=${_PROJECT_ID}:${_REGION}:${_DB_INSTANCE_NAME}'
+  - '--allow-unauthenticated'
 options:
   logging: CLOUD_LOGGING_ONLY
 
