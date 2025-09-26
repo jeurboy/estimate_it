@@ -2,9 +2,8 @@
 
 import React, { useEffect, useRef } from 'react';
 import { useProject } from '@/contexts/ProjectContext';
-import { Card, Menu, Spin, Button, Space, message } from 'antd';
+import { Card, Segmented, Spin, Button, Space, message } from 'antd';
 import { usePathname, useRouter, useParams } from 'next/navigation';
-import Link from 'next/link';
 import ProjectSelector from '@/components/ProjectSelector';
 import { DashboardOutlined, CalculatorOutlined, FileTextOutlined, HistoryOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 
@@ -86,16 +85,20 @@ export default function ProjectLayout({ children }: { children: React.ReactNode;
         return <Spin size="large" tip="Loading Project..." fullscreen />;
     }
 
-    const dynamicNavItems = projectNavItems.map(item => ({
-        ...item,
-        label: <Link href={`/project/${params.projectId}${item.key}`}>{item.label}</Link>,
-        key: `/project/${params.projectId}${item.key}`
+    const segmentedOptions = projectNavItems.map(item => ({
+        value: `/project/${params.projectId}${item.key}`,
+        label: (
+            <Space>
+                {item.icon}
+                {item.label}
+            </Space>
+        ),
     }));
 
     return (
         <>
             <Card style={{ marginBottom: 24 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
                     <Space>
                         <ProjectSelector />
                         <Button icon={<ArrowLeftOutlined />} onClick={() => {
@@ -105,10 +108,10 @@ export default function ProjectLayout({ children }: { children: React.ReactNode;
                             กลับไปหน้ารายการโปรเจกต์
                         </Button>
                     </Space>
-                    <Menu
-                        mode="horizontal"
-                        selectedKeys={[pathname]}
-                        items={dynamicNavItems}
+                    <Segmented
+                        value={pathname}
+                        options={segmentedOptions}
+                        onChange={(value) => router.push(value as string)}
                     />
                 </div>
             </Card>

@@ -1,0 +1,12 @@
+{
+  // Inherit all settings from the main tsconfig.json
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // This allows you to import files with .ts extensions, which is a prerequisite.
+    "allowImportingTsExtensions": true,
+    // This tells TypeScript not to output any compiled files for this configuration,
+    // as ts-node will handle compilation in memory.
+    "noEmit": true
+  },
+  "include": ["scripts/**/*.ts"]
+}

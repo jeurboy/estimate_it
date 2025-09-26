@@ -1,5 +1,5 @@
 import { SubTask } from '@/lib/services/geminiService';
-import { pgTable, uuid, varchar, text, boolean, jsonb, numeric, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, text, boolean, jsonb, numeric, timestamp, pgEnum, serial } from 'drizzle-orm/pg-core';
 import { vector } from 'drizzle-orm/pg-core';
 
 /**
@@ -67,6 +67,7 @@ export interface Project {
 }
 
 export const projects = pgTable('projects', {
+  organization_id: uuid('organization_id').references(() => organizations.id, { onDelete: 'cascade' }),
   id: uuid('id').primaryKey().defaultRandom(),
   name_th: varchar('name_th', { length: 255 }).notNull(),
   name_en: varchar('name_en', { length: 255 }).notNull(),
@@ -119,6 +120,60 @@ CREATE TABLE IF NOT EXISTS user_stories (
   project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   feature_name VARCHAR(255) NOT NULL,
   story_text TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+`;
+
+// 1. สร้าง Enum สำหรับ 'role'
+export const userRoleEnum = pgEnum('user_role', ['superadmin', 'admin', 'user']);
+
+// 2. สร้างและ export ตาราง 'users'
+export const users = pgTable('users', {
+  id: serial('id').primaryKey(),
+  organization_id: uuid('organization_id').references(() => organizations.id, { onDelete: 'set null' }),
+  email: varchar('email', { length: 255 }).notNull().unique(),
+  password_hash: text('password_hash').notNull(),
+  role: userRoleEnum('role').notNull().default('user'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * The SQL schema for altering the users table to add organization_id.
+ */
+export const userAlterSchemaSQL = `
+ALTER TABLE users
+ADD COLUMN organization_id UUID REFERENCES organizations(id) ON DELETE SET NULL;
+`;
+
+/**
+ * Represents a single organization in the database.
+ */
+export interface Organization {
+  id: string;
+  name_th: string;
+  name_en: string;
+  description: string;
+  created_at: Date | null;
+}
+
+export const organizations = pgTable('organizations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name_th: varchar('name_th', { length: 255 }).notNull(),
+  name_en: varchar('name_en', { length: 255 }).notNull(),
+  description: text('description').notNull().default(''),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow(),
+});
+
+/**
+ * The SQL schema for the organizations table.
+ */
+export const organizationSchemaSQL = `
+CREATE TABLE IF NOT EXISTS organizations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name_th VARCHAR(255) NOT NULL,
+  name_en VARCHAR(255) NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 `;

@@ -13,11 +13,17 @@ import { UserStory, EstimationHistory } from '@/lib/db/schema';
 
 const { Title, Text } = Typography;
 
+interface GeneratedStory {
+    featureName: string;
+    storyText: string;
+    clientId: string; // A unique ID generated on the client
+}
+
 export default function EstimationPage() {
     // State for the new task input field, managed locally on this page.
     const [taskDescription, setTaskDescription] = useState('');
     const [isStoryModalVisible, setIsStoryModalVisible] = useState(false);
-    const [generatedStories, setGeneratedStories] = useState<{ featureName: string; storyText: string }[]>([]);
+    const [generatedStories, setGeneratedStories] = useState<GeneratedStory[]>([]);
     const [isGeneratingStories, setIsGeneratingStories] = useState(false);
     const [isSavingAll, setIsSavingAll] = useState(false);
     const [savedStories, setSavedStories] = useState<UserStory[]>([]);
@@ -99,7 +105,12 @@ export default function EstimationPage() {
             });
             if (!response.ok) throw new Error('Failed to generate stories from API.');
             const data = await response.json();
-            setGeneratedStories(data.stories || []);
+            // Augment stories with a unique client-side ID for the key
+            const storiesWithClientIds = (data.stories || []).map((story: { featureName: string; storyText: string; }) => ({
+                ...story,
+                clientId: `${story.featureName}-${Math.random()}`
+            }));
+            setGeneratedStories(storiesWithClientIds);
             setIsStoryModalVisible(true);
         } catch (error: unknown) {
             const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
@@ -109,7 +120,7 @@ export default function EstimationPage() {
         }
     };
 
-    const handleSaveStory = async (story: { featureName: string; storyText: string }) => {
+    const handleSaveStory = async (story: Omit<GeneratedStory, 'clientId'>) => {
         if (!selectedProject) return;
         try {
             const response = await fetch('/api/user-stories', {
@@ -132,8 +143,8 @@ export default function EstimationPage() {
         setIsSavingAll(true);
         try {
             // Find the full story objects from the selected keys
-            const selectedStories = generatedStories.filter((story, index) =>
-                selectedStoryKeys.includes(`${story.featureName}-${index}`)
+            const selectedStories = generatedStories.filter(story =>
+                selectedStoryKeys.includes(story.clientId)
             );
 
             // Filter out stories with feature names that already exist
@@ -208,7 +219,7 @@ export default function EstimationPage() {
             title: 'Actions',
             key: 'actions',
             width: '20%',
-            render: (_: unknown, record: { featureName: string; storyText: string }) => (
+            render: (_: unknown, record: GeneratedStory) => (
                 <Space>
                     <Button onClick={() => {
                         setTaskDescription(record.storyText);
@@ -232,7 +243,7 @@ export default function EstimationPage() {
         onChange: (newSelectedRowKeys: React.Key[]) => {
             setSelectedStoryKeys(newSelectedRowKeys);
         },
-        getCheckboxProps: (record: { featureName: string; storyText: string }) => ({
+        getCheckboxProps: (record: GeneratedStory) => ({
             disabled: isFeatureNameDuplicate(record.featureName), // Disable checkbox if story is already saved
         }),
     };
@@ -426,7 +437,7 @@ export default function EstimationPage() {
                     rowSelection={rowSelection}
                     columns={generatedStoriesColumns}
                     dataSource={generatedStories}
-                    rowKey={(record) => record.featureName}
+                    rowKey="clientId"
                     pagination={{ pageSize: 10 }}
                     size="small"
                 />

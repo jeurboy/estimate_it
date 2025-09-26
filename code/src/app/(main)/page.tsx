@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { Bar, Line } from '@ant-design/charts';
 import { EstimationHistory, Project } from '@/lib/db/schema';
 import { useProject } from '@/contexts/ProjectContext';
+import { useApi } from '@/hooks/useApi';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -26,30 +27,28 @@ const HomePage = () => {
     const { projects, setProjects, setSelectedProject } = useProject();
     const [chartData, setChartData] = useState<ProjectManDays[]>([]);
     const [tasksByWeekData, setTasksByWeekData] = useState<WeeklyTaskData[]>([]);
-    const [loading, setLoading] = useState(true); // Combined loading state for all data on this page
+    const { apiFetch, loading, error, setError } = useApi();
 
     const fetchData = useCallback(async () => {
-        setLoading(true); // This will now control loading for charts AND projects
         try {
             const [historyRes, projectsRes] = await Promise.all([
-                fetch('/api/history'),
-                fetch('/api/projects')
+                apiFetch<{ history: EstimationHistory[] }>('/api/history'),
+                apiFetch<Project[]>('/api/projects')
             ]);
 
-            if (!historyRes.ok || !projectsRes.ok) {
-                throw new Error('Failed to fetch data');
+            // If apiFetch handled a 401, the response will be null
+            if (!historyRes || !projectsRes) {
+                return;
             }
 
-            const historyData = await historyRes.json();
-            const projectsData = await projectsRes.json();
-
-            const fetchedProjects: Project[] = projectsData?.projects || [];
-            const history: EstimationHistory[] = historyData?.history || [];
+            const fetchedProjects: Project[] = Array.isArray(projectsRes) ? projectsRes : [];
+            const history: EstimationHistory[] = historyRes?.history || [];
             setProjects(fetchedProjects); // Update the context with the fetched projects
 
             // --- Process data for Tasks per Week Chart ---
             const tasksByWeek: { [key: string]: number } = {};
-            const getStartOfWeek = (dateStr: string | Date) => {
+            const getStartOfWeek = (dateStr: string | Date | null) => {
+                if (!dateStr) return null;
                 const date = new Date(dateStr);
                 const day = date.getDay();
                 const diff = date.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is Sunday
@@ -57,8 +56,9 @@ const HomePage = () => {
             };
 
             history.forEach(item => {
-                if (!item.is_reference && item.created_at) {
-                    const weekStart = getStartOfWeek(item.created_at);
+                if (!item.is_reference) {
+                    const weekStart = getStartOfWeek(item.created_at); // item.created_at is Date | null
+                    if (!weekStart) return;
                     tasksByWeek[weekStart] = (tasksByWeek[weekStart] || 0) + 1;
                 }
             });
@@ -86,15 +86,13 @@ const HomePage = () => {
 
         } catch (error) {
             console.error("Failed to load dashboard data:", error);
-            message.error('An error occurred while loading dashboard data.');
-        } finally {
-            setLoading(false);
+            setError('An error occurred while loading dashboard data.');
         }
-    }, [setProjects]);
+    }, [apiFetch, setProjects, setError]);
 
     useEffect(() => {
         fetchData();
-    }, [fetchData]);
+    }, [fetchData]); // fetchData is now stable due to useCallback
 
     return (
         <div style={{ maxWidth: 1200, margin: '0 auto' }}>
@@ -151,7 +149,6 @@ const HomePage = () => {
                                 data={chartData}
                                 xField="projectName"
                                 yField="totalMandays"
-                                seriesField="projectName"
                                 legend={false}
                                 height={400}
                                 xAxis={{ title: { text: 'Project' } }}
