@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, Col, Row, Typography, Statistic, Empty, Spin, message, Button, Divider, Space } from 'antd';
-import { ArrowRightOutlined, FolderOpenOutlined, ReloadOutlined, AppstoreOutlined } from '@ant-design/icons';
+import { Card, Col, Row, Typography, Empty, Spin, message, Button, Divider, Space } from 'antd';
+import { ReloadOutlined, AppstoreOutlined } from '@ant-design/icons';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Bar, Line } from '@ant-design/charts';
@@ -11,11 +11,21 @@ import { useProject } from '@/contexts/ProjectContext';
 
 const { Title, Paragraph, Text } = Typography;
 
+interface ProjectManDays {
+    projectName: string;
+    totalMandays: number;
+}
+
+interface WeeklyTaskData {
+    week: string;
+    count: number;
+}
+
 const HomePage = () => {
     const router = useRouter();
     const { projects, setProjects, setSelectedProject } = useProject();
-    const [chartData, setChartData] = useState<any[]>([]);
-    const [tasksByWeekData, setTasksByWeekData] = useState<any[]>([]);
+    const [chartData, setChartData] = useState<ProjectManDays[]>([]);
+    const [tasksByWeekData, setTasksByWeekData] = useState<WeeklyTaskData[]>([]);
     const [loading, setLoading] = useState(true); // Combined loading state for all data on this page
 
     const fetchData = useCallback(async () => {
@@ -39,7 +49,7 @@ const HomePage = () => {
 
             // --- Process data for Tasks per Week Chart ---
             const tasksByWeek: { [key: string]: number } = {};
-            const getStartOfWeek = (dateStr: string) => {
+            const getStartOfWeek = (dateStr: string | Date) => {
                 const date = new Date(dateStr);
                 const day = date.getDay();
                 const diff = date.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is Sunday
@@ -47,7 +57,7 @@ const HomePage = () => {
             };
 
             history.forEach(item => {
-                if (!item.is_reference) {
+                if (!item.is_reference && item.created_at) {
                     const weekStart = getStartOfWeek(item.created_at);
                     tasksByWeek[weekStart] = (tasksByWeek[weekStart] || 0) + 1;
                 }

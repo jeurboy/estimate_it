@@ -22,8 +22,9 @@ const ProjectPage = () => {
             if (!response.ok) throw new Error('Failed to fetch projects');
             const data = await response.json();
             setProjects(data.projects);
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err);
+            setError(message);
         } finally {
             setLoading(false);
         }
@@ -50,8 +51,9 @@ const ProjectPage = () => {
             const response = await fetch(`/api/projects/${id}`, { method: 'DELETE' });
             if (!response.ok) throw new Error('Failed to delete project');
             setProjects(projects.filter(p => p.id !== id));
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err);
+            setError(message);
         }
     };
 
@@ -75,8 +77,9 @@ const ProjectPage = () => {
             setIsModalVisible(false);
             fetchProjects(); // Refresh the list
 
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err);
+            setError(message);
         }
     };
 
@@ -87,7 +90,7 @@ const ProjectPage = () => {
             title: 'Duration (Months)',
             dataIndex: 'duration_months',
             key: 'duration_months',
-            sorter: (a, b) => a.duration_months - b.duration_months,
+            sorter: (a, b) => Number(a.duration_months) - Number(b.duration_months),
             render: (val) => parseFloat(String(val)).toFixed(2)
         },
         {
@@ -119,7 +122,7 @@ const ProjectPage = () => {
 
             <Card>
                 <Spin spinning={loading}>
-                    <Table columns={columns} dataSource={projects} rowKey="id" />
+                    <Table columns={columns} dataSource={projects} rowKey={(record) => record.id} />
                 </Spin>
             </Card>
 

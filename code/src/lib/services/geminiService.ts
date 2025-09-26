@@ -64,9 +64,10 @@ class GeminiService {
                 prompt: systemPrompt, // Return the prompt for logging
                 rawResponse: responseText,
             };
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Error in estimateFeature:", error);
-            throw new EstimationError(`Failed to get estimation from AI: ${error.message}`);
+            const message = error instanceof Error ? error.message : String(error);
+            throw new EstimationError(`Failed to get estimation from AI: ${message}`);
         }
     }
 
@@ -79,9 +80,10 @@ class GeminiService {
                 safetySettings: this.safetySettings,
             });
             return JSON.parse(result.response.text());
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Error in generateStories:", error);
-            throw new EstimationError(`Failed to generate stories from AI: ${error.message}`);
+            const message = error instanceof Error ? error.message : String(error);
+            throw new EstimationError(`Failed to generate stories from AI: ${message}`);
         }
     }
 }

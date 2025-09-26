@@ -101,8 +101,9 @@ export default function EstimationPage() {
             const data = await response.json();
             setGeneratedStories(data.stories || []);
             setIsStoryModalVisible(true);
-        } catch (error: any) {
-            message.error(`Error generating stories: ${error.message}`);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+            message.error(`Error generating stories: ${errorMessage}`);
         } finally {
             setIsGeneratingStories(false);
         }
@@ -120,8 +121,9 @@ export default function EstimationPage() {
             const newStory = await response.json();
             setSavedStories(prev => [...prev, newStory]);
             message.success('User story saved!');
-        } catch (error: any) {
-            message.error(`Error saving story: ${error.message}`);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            message.error(`Error saving story: ${errorMessage}`);
         }
     };
 
@@ -170,8 +172,9 @@ export default function EstimationPage() {
             message.success(successMessage);
             setSelectedStoryKeys([]); // Clear selection
             setIsStoryModalVisible(false);
-        } catch (error: any) {
-            message.error(`Error saving all stories: ${error.message}`);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            message.error(`Error saving all stories: ${errorMessage}`);
         } finally {
             setIsSavingAll(false);
         }
@@ -205,7 +208,7 @@ export default function EstimationPage() {
             title: 'Actions',
             key: 'actions',
             width: '20%',
-            render: (_: any, record: { featureName: string; storyText: string }) => (
+            render: (_: unknown, record: { featureName: string; storyText: string }) => (
                 <Space>
                     <Button onClick={() => {
                         setTaskDescription(record.storyText);
@@ -277,7 +280,7 @@ export default function EstimationPage() {
                                 }}
                             >
                                 <Typography.Paragraph style={{ margin: 0 }}>
-                                    {selectedProject.description}
+                                    {selectedProject?.description || 'No project selected. Please choose a project from the header.'}
                                 </Typography.Paragraph>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -332,7 +335,11 @@ export default function EstimationPage() {
                             <Button onClick={() => setTaskDescription('')} disabled={!taskDescription.trim()}>Clear</Button>
                             <Button
                                 type="primary"
-                                onClick={() => handleEstimate(taskDescription, selectedProject.description, selectedProject.id, isTaskFromSavedStory())}
+                                onClick={() => {
+                                    if (selectedProject) {
+                                        handleEstimate(taskDescription, selectedProject.description, selectedProject.id, isTaskFromSavedStory());
+                                    }
+                                }}
                                 loading={isLoading}
                                 disabled={!taskDescription.trim()}
                             >
@@ -377,7 +384,7 @@ export default function EstimationPage() {
                     <ResultsTable subTasks={results.subTasks} cost={results.cost} onSubTasksChange={handleSubTasksChange} />
                     <SaveToHistoryForm functionName={functionName}
                         onSubmit={async (savedFunctionName, isReference) => {
-                            const newHistoryRecord = await handleSaveToHistory(savedFunctionName, isReference, selectedProject.id);
+                            const newHistoryRecord = await handleSaveToHistory(savedFunctionName, isReference, selectedProject?.id);
                             if (newHistoryRecord) {
                                 // Add the new record to the local state to update the UI instantly
                                 setProjectHistory(prev => [newHistoryRecord, ...prev]);
@@ -419,7 +426,7 @@ export default function EstimationPage() {
                     rowSelection={rowSelection}
                     columns={generatedStoriesColumns}
                     dataSource={generatedStories}
-                    rowKey={(record, index) => `${record.featureName}-${index}`}
+                    rowKey={(record) => record.featureName}
                     pagination={{ pageSize: 10 }}
                     size="small"
                 />

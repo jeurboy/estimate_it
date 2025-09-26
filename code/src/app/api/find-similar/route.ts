@@ -1,5 +1,6 @@
 import { findSimilarEstimations } from '@/lib/db/history';
 import { getEmbedding } from '@/lib/services/embeddingService';
+import { createErrorResponse } from '@/lib/utils/normalize';
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
@@ -18,14 +19,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ similarTasks });
 
-    } catch (error: any) {
-        console.error("Error in find-similar route:", error);
-
-        // Check if the error is from the embedding service
-        if (error.message.includes('embedding')) {
-            return NextResponse.json({ error: `Failed to generate embedding: ${error.message}` }, { status: 500 });
-        }
-
-        return NextResponse.json({ error: 'An internal server error occurred while finding similar tasks.' }, { status: 500 });
+    } catch (error: unknown) {
+        return createErrorResponse(error, 'POST /api/find-similar');
     }
 }

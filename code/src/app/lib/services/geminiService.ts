@@ -7,11 +7,6 @@ export interface SubTask {
     'Days': number;
 }
 
-// Define the structure of the entire JSON object expected from the Gemini API
-interface EstimationResult {
-    subTasks: SubTask[];
-}
-
 // Define the final output structure of the service
 export interface GeminiEstimation {
     subTasks: SubTask[];
@@ -19,6 +14,20 @@ export interface GeminiEstimation {
     prompt: string;
     rawResponse: string;
 }
+
+// Interfaces for potential Gemini response shapes
+interface UserStoryResponse {
+    userStories: {
+        tasks?: {
+            task?: string;
+            subTasks?: string[];
+            dod?: string;
+            estimatedDuration?: string;
+        }[];
+    }[];
+}
+
+interface SubTaskResponse { subTasks: SubTask[]; }
 
 // Pricing for gemini-1.5-flash-latest model as of May 2024.
 const GEMINI_FLASH_INPUT_COST_PER_1K_TOKENS = 0.00035;
@@ -74,7 +83,7 @@ export async function estimateFeature(
         // This logic handles both the originally intended format `{"subTasks": [...]}`
         // and the observed format `{"userStories": [...]}` which caused the error.
 
-        let parsedJson: any;
+        let parsedJson: unknown;
         try {
             parsedJson = JSON.parse(content);
         } catch (parseError) {
@@ -84,20 +93,27 @@ export async function estimateFeature(
 
         let finalSubTasks: SubTask[] = [];
 
+        // Type guards to safely check the response structure
+        const isUserStoriesResponse = (obj: unknown): obj is UserStoryResponse =>
+            typeof obj === 'object' && obj !== null && 'userStories' in obj && Array.isArray((obj as UserStoryResponse).userStories);
+
+        const isSubTaskResponse = (obj: unknown): obj is SubTaskResponse =>
+            typeof obj === 'object' && obj !== null && 'subTasks' in obj && Array.isArray((obj as SubTaskResponse).subTasks);
+
         // Handle the observed "userStories" format by transforming it.
-        if (parsedJson.userStories && Array.isArray(parsedJson.userStories)) {
-            finalSubTasks = parsedJson.userStories.flatMap((story: any) =>
-                story.tasks?.map((task: any) => ({
+        if (isUserStoriesResponse(parsedJson)) {
+            finalSubTasks = parsedJson.userStories.flatMap((story) =>
+                story.tasks?.map((task): SubTask => ({
                     'Sub-Task': task.task || 'Untitled Task',
                     'Description': Array.isArray(task.subTasks) && task.subTasks.length > 0
                         ? '- ' + task.subTasks.join('\n- ')
                         : task.dod || 'No description provided.',
-                    'Complexity (1-5)': parseInt(task.estimatedDuration, 10) || 0,
+                    'Days': parseFloat(task.estimatedDuration || '0') || 0,
                 })) || []
             );
         }
         // Handle the original intended "subTasks" format.
-        else if (parsedJson.subTasks && Array.isArray(parsedJson.subTasks)) {
+        else if (isSubTaskResponse(parsedJson)) {
             finalSubTasks = parsedJson.subTasks;
         } else {
             throw new Error("The Gemini response does not contain a recognizable 'subTasks' or 'userStories' array.");
@@ -110,9 +126,10 @@ export async function estimateFeature(
             rawResponse: rawResponseForLogging,
         };
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Gemini API error:', error);
+        const message = error instanceof Error ? error.message : String(error);
         // Provide a more user-friendly error message
-        throw new Error(`An error occurred with the Gemini API. Please check your API key and ensure it has the necessary permissions. Details: ${error.message}`);
+        throw new Error(`An error occurred with the Gemini API. Please check your API key and ensure it has the necessary permissions. Details: ${message}`);
     }
 }

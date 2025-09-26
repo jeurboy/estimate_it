@@ -30,8 +30,7 @@ export async function POST(request: Request) {
         const result = await geminiService.generateStories(SUGGEST_STORY_PROMPT, taskDescription);
         return NextResponse.json(result);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         return createErrorResponse(error, 'POST /api/suggest-story');
     }
 }
-

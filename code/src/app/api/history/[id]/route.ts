@@ -1,13 +1,15 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { deleteEstimation, updateEstimation } from '@/lib/db/history';
 import { createErrorResponse } from '@/lib/utils/normalize';
 
 export async function PUT(
-    request: Request,
-    { params }: { params: { id: string } }
+    request: NextRequest,
+    context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params; // Await the params promise
+    const { id } = params; // Now you can safely access id
+
     try {
-        const id = params.id;
         const body = await request.json();
         const { subTasks, cost, functionName, featureDescription } = body;
 
@@ -23,18 +25,19 @@ export async function PUT(
 
         return NextResponse.json(updatedRecord);
 
-    } catch (error: any) {
-        return createErrorResponse(error, `PUT /api/history/${params.id}`);
+    } catch (error: unknown) {
+        return createErrorResponse(error, `PUT /api/history/${id}`);
     }
 }
 
 export async function DELETE(
-    request: Request,
-    { params }: { params: { id: string } }
+    request: NextRequest,
+    context: { params: Promise<{ id: string }> }
 ) {
-    try {
-        const id = params.id;
+    const params = await context.params; // Await the params promise
+    const { id } = params; // Now you can safely access id
 
+    try {
         if (!id) {
             return NextResponse.json({ error: 'Estimation ID is required.' }, { status: 400 });
         }
@@ -47,8 +50,7 @@ export async function DELETE(
 
         return NextResponse.json({ message: 'Estimation deleted successfully.', deletedRecord });
 
-    } catch (error: any) {
-        console.error(`[API /api/history/${params.id}] DELETE Error:`, error);
-        return NextResponse.json({ error: error.message || 'An internal server error occurred.' }, { status: 500 });
+    } catch (error: unknown) {
+        return createErrorResponse(error, `DELETE /api/history/${id}`);
     }
 }

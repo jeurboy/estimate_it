@@ -35,7 +35,7 @@ export async function POST(request: Request) {
 
     const result = await geminiService.generateStories(USER_STORY_PROMPT, projectDescription);
     return NextResponse.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     return createErrorResponse(error, 'POST /api/generate-stories');
   }
 }

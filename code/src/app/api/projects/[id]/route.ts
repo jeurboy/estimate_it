@@ -1,13 +1,14 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { updateProject, deleteProject } from '@/lib/db/projects';
 import { createErrorResponse } from '@/lib/utils/normalize';
 
 export async function PUT(
-    request: Request,
-    { params }: { params: { id: string } }
+    request: NextRequest,
+    context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params; // Await the params promise
+    const { id } = params; // Now you can safely access id
     try {
-        const id = params.id;
         const body = await request.json();
         const { name_th, name_en, duration_months, description } = body;
 
@@ -22,17 +23,21 @@ export async function PUT(
 
         return NextResponse.json(updatedRecord);
 
-    } catch (error: any) {
-        return createErrorResponse(error, `PUT /api/projects/${params.id}`);
+    } catch (error: unknown) {
+        return createErrorResponse(error, `PUT /api/projects/${id}`);
     }
 }
 
 export async function DELETE(
-    request: Request,
-    { params }: { params: { id: string } }
+    request: NextRequest,
+    context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params; // Await the params promise
+    const { id } = params; // Now you can safely access id
     try {
-        const id = params.id;
+        const params = await context.params; // Await the params promise
+        const { id } = params; // Now you can safely access id
+
 
         if (!id) {
             return NextResponse.json({ error: 'Project ID is required.' }, { status: 400 });
@@ -46,7 +51,7 @@ export async function DELETE(
 
         return NextResponse.json({ message: 'Project deleted successfully.', deletedRecord });
 
-    } catch (error: any) {
-        return createErrorResponse(error, `DELETE /api/projects/${params.id}`);
+    } catch (error: unknown) {
+        return createErrorResponse(error, `DELETE /api/projects/${id}`);
     }
 }

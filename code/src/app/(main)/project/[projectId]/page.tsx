@@ -7,17 +7,20 @@ import { TableProps } from 'antd';
 import { EstimationHistory } from '@/lib/db/schema';
 import { useHistoryPage } from '@/hooks/useHistoryPage';
 import { useProject } from '@/contexts/ProjectContext';
+import { SubTask } from '@/lib/services/geminiService';
 
 const { Title, Paragraph, Text } = Typography;
 const { Search } = Input;
 
-interface EditableCellProps extends React.HTMLAttributes<HTMLElement> {
+type EditableSubTask = SubTask & { key: React.Key };
+
+interface EditableCellProps {
     editing: boolean;
     dataIndex: string;
-    title: any;
+    title: React.ReactNode;
     inputType: 'number' | 'text';
-    record: any;
-    index: number;
+    record: EditableSubTask;
+    children?: React.ReactNode;
 }
 
 const EditableCell: React.FC<React.PropsWithChildren<EditableCellProps>> = ({
@@ -26,14 +29,12 @@ const EditableCell: React.FC<React.PropsWithChildren<EditableCellProps>> = ({
     title,
     inputType,
     record,
-    index,
     children,
-    ...restProps
 }) => {
     const inputNode = inputType === 'number' ? <InputNumber step="0.1" style={{ width: '100%' }} /> : <Input.TextArea autoSize={{ minRows: 1 }} />;
 
     return (
-        <td {...restProps}>
+        <td>
             {editing ? (
                 <Form.Item
                     name={dataIndex}
@@ -87,7 +88,7 @@ const HistoryPage = () => {
         }
     }, [selectedRecord, form]);
 
-    const isEditing = (record: any) => record.key === editingKey;
+    const isEditing = (record: { key: React.Key }) => record.key === editingKey;
 
     const columns: TableProps<EstimationHistory>['columns'] = [
         {
@@ -99,15 +100,15 @@ const HistoryPage = () => {
             title: 'Estimated Days',
             dataIndex: 'cost',
             key: 'cost',
-            sorter: (a, b) => parseFloat(String(a.cost) || '0') - parseFloat(String(b.cost) || '0'),
-            render: (cost: any) => `${parseFloat(String(cost || '0')).toFixed(2)}`,
+            sorter: (a, b) => Number(a.cost ?? 0) - Number(b.cost ?? 0),
+            render: (cost: string | number | null) => `${Number(cost ?? 0).toFixed(2)}`,
         },
         {
             title: 'Date',
             dataIndex: 'created_at',
             key: 'created_at',
-            sorter: (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-            render: (date: string) => new Date(date).toLocaleString(),
+            sorter: (a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime(),
+            render: (date: string | null) => date ? new Date(date).toLocaleString() : '-',
             defaultSortOrder: 'descend',
         },
         {
@@ -160,13 +161,13 @@ const HistoryPage = () => {
         }
     };
 
-    const handleModalSubTasksChange = (newSubTasks: any[]) => {
+    const handleModalSubTasksChange = (newSubTasks: EditableSubTask[]) => {
         if (!selectedRecord) return;
         const newCost = newSubTasks.reduce((sum, task) => sum + (parseFloat(String(task.Days)) || 0), 0);
         setSelectedRecord({
             ...selectedRecord,
             sub_tasks: newSubTasks,
-            cost: newCost,
+            cost: String(newCost),
         });
         form.setFieldsValue({ cost: newCost });
     };
@@ -174,12 +175,12 @@ const HistoryPage = () => {
     const subTaskColumns = [
         { title: 'Sub-Task', dataIndex: 'Sub-Task', key: 'sub-task', width: '25%', editable: true },
         { title: 'Description', dataIndex: 'Description', key: 'description', editable: true },
-        { title: 'Days', dataIndex: 'Days', key: 'days', width: '10%', editable: true, render: (days: any) => parseFloat(String(days || '0')).toFixed(2) },
+        { title: 'Days', dataIndex: 'Days', key: 'days', width: '10%', editable: true, render: (days: number | string) => parseFloat(String(days || '0')).toFixed(2) },
         {
             title: 'Action',
             dataIndex: 'action',
             width: '15%',
-            render: (_: any, record: any) => {
+            render: (_: unknown, record: EditableSubTask) => {
                 const editable = isEditing(record);
                 return editable ? (
                     <span>
@@ -205,21 +206,21 @@ const HistoryPage = () => {
         },
     ];
 
-    const editSubTask = (record: any) => {
+    const editSubTask = (record: EditableSubTask) => {
         subTaskForm.setFieldsValue({ ...record }); // Use the sub-task form
-        setEditingKey(record.key);
+        setEditingKey(String(record.key));
     };
 
     const deleteSubTask = (key: React.Key) => {
-        const newSubTasks = selectedRecord?.sub_tasks.filter((item: any, index) => (item['Sub-Task'] || `task-${index}`) !== key) || [];
+        const newSubTasks = (selectedRecord?.sub_tasks as EditableSubTask[])?.filter((item) => item.key !== key) || [];
         handleModalSubTasksChange(newSubTasks); // This will update the state
     };
 
     const saveSubTask = async (key: React.Key) => {
         try {
             const row = await subTaskForm.validateFields(); // Validate the sub-task form
-            const newSubTasks = [...(selectedRecord?.sub_tasks || [])];
-            const index = newSubTasks.findIndex((item: any, idx) => (item['Sub-Task'] || `task-${idx}`) === key);
+            const newSubTasks = [...(selectedRecord?.sub_tasks || [])] as EditableSubTask[];
+            const index = newSubTasks.findIndex((item) => item.key === key);
             if (index > -1) {
                 newSubTasks[index] = { ...newSubTasks[index], ...row };
                 handleModalSubTasksChange(newSubTasks);
@@ -232,8 +233,8 @@ const HistoryPage = () => {
 
     const addNewSubTask = () => {
         const newKey = `new-task-${Date.now()}`;
-        const newSubTask = { 'Sub-Task': newKey, Description: '', Days: 0, key: newKey };
-        handleModalSubTasksChange([...(selectedRecord?.sub_tasks || []), newSubTask]);
+        const newSubTask: EditableSubTask = { 'Sub-Task': newKey, Description: '', Days: 0, key: newKey };
+        handleModalSubTasksChange([...(selectedRecord?.sub_tasks || []), newSubTask] as EditableSubTask[]);
         editSubTask(newSubTask);
     };
 
@@ -308,7 +309,7 @@ const HistoryPage = () => {
                                     if (!('editable' in col && col.editable)) return col;
                                     return {
                                         ...col,
-                                        onCell: (record: any) => ({
+                                        onCell: (record: EditableSubTask) => ({
                                             record,
                                             inputType: col.dataIndex === 'Days' ? 'number' : 'text',
                                             dataIndex: col.dataIndex,
@@ -317,7 +318,8 @@ const HistoryPage = () => {
                                         }),
                                     };
                                 })}
-                                dataSource={selectedRecord.sub_tasks.map((t, i) => ({ ...t, key: t['Sub-Task'] || `task-${i}` }))}
+                                dataSource={selectedRecord.sub_tasks.map((task, index) => ({ ...task, key: (task as EditableSubTask).key || task['Sub-Task'] || `task-${index}` })) as EditableSubTask[]}
+                                rowKey="key"
                                 pagination={false}
                                 size="small"
                                 bordered

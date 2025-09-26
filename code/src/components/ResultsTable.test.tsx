@@ -9,16 +9,16 @@ describe('ResultsTable', () => {
         {
             'Sub-Task': 'API Design',
             'Description': 'Design the API endpoints for user management.',
-            'Complexity (1-5)': 3,
+            'Days': 3,
         },
         {
             'Sub-Task': 'UI Implementation',
             'Description': 'Implement the user profile page.\n- Add form fields.\n- Add save button.',
-            'Complexity (1-5)': 5,
+            'Days': 5,
         },
     ];
 
-    const mockCost = 0.0012345;
+    const mockCost = 8;
 
     it('should render null if subTasks array is empty', () => {
         const { container } = render(<ResultsTable subTasks={[]} cost={0} />);
@@ -26,8 +26,8 @@ describe('ResultsTable', () => {
     });
 
     it('should render null if subTasks prop is not provided', () => {
-        // @ts-ignore-next-line - Intentionally testing invalid prop for robustness
-        const { container } = render(<ResultsTable subTasks={null} cost={0} />);
+        // @ts-expect-error - Intentionally testing invalid prop for robustness
+        const { container } = render(<ResultsTable subTasks={null} cost={0} onSubTasksChange={() => { }} />);
         expect(container).toBeEmptyDOMElement();
     });
 
@@ -40,7 +40,7 @@ describe('ResultsTable', () => {
         // 2. Check for table headers (Antd renders them as simple text in `th` elements)
         expect(screen.getByText('Sub-Task')).toBeInTheDocument();
         expect(screen.getByText('Description')).toBeInTheDocument();
-        expect(screen.getByText('Complexity (1-5)')).toBeInTheDocument();
+        expect(screen.getByText('Days')).toBeInTheDocument();
 
         // 3. Check for the content of the first task
         expect(screen.getByText('API Design')).toBeInTheDocument();
@@ -53,14 +53,14 @@ describe('ResultsTable', () => {
         // Verify that the class responsible for rendering newlines is present
         expect(multiLineDescription).toHaveClass('whitespace-pre-line');
         // The text content gets normalized by testing-library, so we check for the concatenated content
-        expect(multiLineDescription).toHaveTextContent('Implement the user profile page.- Add form fields.- Add save button.');
+        expect(multiLineDescription).toHaveTextContent('Implement the user profile page.\n- Add form fields.\n- Add save button.');
 
-        // 5. Check for complexity values
-        expect(screen.getByText('3')).toBeInTheDocument();
-        expect(screen.getByText('5')).toBeInTheDocument();
+        // 5. Check for Days values
+        expect(screen.getByText('3.00')).toBeInTheDocument();
+        expect(screen.getByText('5.00')).toBeInTheDocument();
 
-        // 6. Check for the total cost, correctly formatted
-        expect(screen.getByText(/Total Estimated Cost:/i)).toBeInTheDocument();
-        expect(screen.getByText(`$${mockCost.toFixed(6)}`)).toBeInTheDocument();
+        // 6. Check for the total estimated days, correctly formatted
+        expect(screen.getByText(/Total Estimated Days:/i)).toBeInTheDocument();
+        expect(screen.getByText(`${mockCost.toFixed(2)} days`)).toBeInTheDocument();
     });
 });

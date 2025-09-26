@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { geminiService } from '@/lib/services/geminiService';
+import { geminiService, EstimationError } from '@/lib/services/geminiService';
+import { createErrorResponse } from '@/lib/utils/normalize';
 
 export async function POST(request: Request) {
     try {
@@ -23,10 +24,7 @@ export async function POST(request: Request) {
         const result = await geminiService.estimateFeature(systemPrompt, featureDescription);
 
         return NextResponse.json(result);
-    } catch (error: any) {
-        console.error('[API /api/estimate] Error:', error);
-        const status = error?.status || 500;
-        const message = error?.message || 'An internal server error occurred.';
-        return NextResponse.json({ error: message }, { status });
+    } catch (error: unknown) {
+        return createErrorResponse(error, 'POST /api/estimate');
     }
 }

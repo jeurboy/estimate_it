@@ -15,7 +15,11 @@ export interface ProjectData {
  */
 export async function listProjects(): Promise<Project[]> {
     try {
-        return await db.select().from(projects).orderBy(desc(projects.created_at));
+        const projectRecords = await db.select().from(projects).orderBy(desc(projects.created_at));
+        return projectRecords.map(p => ({
+            ...p,
+            duration_months: parseFloat(p.duration_months),
+        }));
     } catch (error) {
         console.error("Database error in listProjects:", error);
         throw new Error("Failed to retrieve projects from the database.");
@@ -33,9 +37,12 @@ export async function createProject(data: ProjectData): Promise<Project> {
             name_th: data.name_th,
             name_en: data.name_en,
             description: data.description,
-            duration_months: data.duration_months,
+            duration_months: String(data.duration_months),
         }).returning();
-        return project;
+        return {
+            ...project,
+            duration_months: parseFloat(project.duration_months),
+        };
     } catch (error) {
         console.error("Database error in createProject:", error);
         throw new Error("Failed to create project in the database.");
@@ -54,13 +61,16 @@ export async function updateProject(id: string, data: ProjectData): Promise<Proj
             name_th: data.name_th,
             name_en: data.name_en,
             description: data.description,
-            duration_months: data.duration_months,
+            duration_months: String(data.duration_months),
             updated_at: new Date(),
         }).where(eq(projects.id, id)).returning();
         if (!project) {
             throw new Error("Project not found for update.");
         }
-        return project;
+        return {
+            ...project,
+            duration_months: parseFloat(project.duration_months),
+        };
     } catch (error) {
         console.error("Database error in updateProject:", error);
         throw new Error("Failed to update project in the database.");
@@ -75,7 +85,11 @@ export async function updateProject(id: string, data: ProjectData): Promise<Proj
 export async function deleteProject(id: string): Promise<Project | null> {
     try {
         const result = await db.delete(projects).where(eq(projects.id, id)).returning();
-        return result.length > 0 ? result[0] : null;
+        if (result.length === 0) {
+            return null;
+        }
+        const deletedProject = result[0];
+        return { ...deletedProject, duration_months: parseFloat(deletedProject.duration_months) };
     } catch (error) {
         console.error("Database error in deleteProject:", error);
         throw new Error("Failed to delete project from the database.");

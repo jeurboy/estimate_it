@@ -24,7 +24,7 @@ export async function POST(request: Request) {
         // 3. Return the results
         return NextResponse.json({ similarProjects });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         return createErrorResponse(error, 'POST /api/history/find-similar');
     }
 }

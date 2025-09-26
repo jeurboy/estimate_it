@@ -1,23 +1,24 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Table, Input, Spin, Alert, Typography, Modal, Space, Button, Popconfirm, Divider, Card, Form, InputNumber, Tooltip } from 'antd';
-import { EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Table, Input, Spin, Alert, Typography, Modal, Space, Button, Popconfirm, Divider, Card, Form, InputNumber, Empty, Tooltip } from 'antd';
+import { EditOutlined, CopyOutlined, DeleteOutlined } from '@ant-design/icons';
 import { TableProps } from 'antd';
 import { EstimationHistory } from '@/lib/db/schema';
 import { useHistoryPage } from '@/hooks/useHistoryPage';
 import { useProject } from '@/contexts/ProjectContext';
 
-const { Title, Text } = Typography;
+import { SubTask } from '@/lib/services/geminiService';
+const { Title, Paragraph, Text } = Typography;
 const { Search } = Input;
 
-interface EditableCellProps extends React.HTMLAttributes<HTMLElement> {
+interface EditableCellProps {
     editing: boolean;
     dataIndex: string;
-    title: any;
+    title: string;
     inputType: 'number' | 'text';
-    record: any;
-    index: number;
+    record: SubTask;
+    children?: React.ReactNode;
 }
 
 const EditableCell: React.FC<React.PropsWithChildren<EditableCellProps>> = ({
@@ -26,14 +27,12 @@ const EditableCell: React.FC<React.PropsWithChildren<EditableCellProps>> = ({
     title,
     inputType,
     record,
-    index,
     children,
-    ...restProps
 }) => {
     const inputNode = inputType === 'number' ? <InputNumber step="0.1" style={{ width: '100%' }} /> : <Input.TextArea autoSize={{ minRows: 1 }} />;
 
     return (
-        <td {...restProps}>
+        <td>
             {editing ? (
                 <Form.Item
                     name={dataIndex}
@@ -54,9 +53,11 @@ const EditableCell: React.FC<React.PropsWithChildren<EditableCellProps>> = ({
     );
 };
 
-const ReferencesPage = () => {
+const HistoryPage = () => {
     const {
         referenceHistory,
+        nonReferenceHistory,
+        history,
         loading,
         isSaving,
         error,
@@ -70,12 +71,13 @@ const ReferencesPage = () => {
         handleExportCSV,
         handleDelete,
         handleOpenNewReferenceModal,
+        handleOpenCloneModal,
         handleSave,
     } = useHistoryPage();
-    const { projects } = useProject();
+    const { selectedProject } = useProject();
 
     const [form] = Form.useForm();
-    const [subTaskForm] = Form.useForm();
+    const [subTaskForm] = Form.useForm(); // Create a separate form for the sub-task table
     const [editingKey, setEditingKey] = useState('');
 
     useEffect(() => {
@@ -84,7 +86,7 @@ const ReferencesPage = () => {
         }
     }, [selectedRecord, form]);
 
-    const isEditing = (record: any) => record.key === editingKey;
+    const isEditing = (record: { key: React.Key }) => record.key === editingKey;
 
     const columns: TableProps<EstimationHistory>['columns'] = [
         {
@@ -96,25 +98,15 @@ const ReferencesPage = () => {
             title: 'Estimated Days',
             dataIndex: 'cost',
             key: 'cost',
-            sorter: (a, b) => parseFloat(String(a.cost) || '0') - parseFloat(String(b.cost) || '0'),
-            render: (cost: any) => `${parseFloat(String(cost || '0')).toFixed(2)}`,
-        },
-        {
-            title: 'Source Project',
-            dataIndex: 'source_project_id',
-            key: 'source_project_id',
-            render: (source_project_id: string | null) => {
-                if (!source_project_id) return <Text type="secondary">Manual</Text>;
-                const project = projects.find(p => p.id === source_project_id);
-                return project ? project.name_en : <Text type="secondary">Unknown</Text>;
-            },
+            sorter: (a, b) => Number(a.cost ?? 0) - Number(b.cost ?? 0),
+            render: (cost: string | number | null) => `${Number(cost ?? 0).toFixed(2)}`,
         },
         {
             title: 'Date',
             dataIndex: 'created_at',
             key: 'created_at',
-            sorter: (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-            render: (date: string) => new Date(date).toLocaleString(),
+            sorter: (a, b) => new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime(),
+            render: (date: string | null) => date ? new Date(date).toLocaleString() : '-',
             defaultSortOrder: 'descend',
         },
         {
@@ -127,9 +119,19 @@ const ReferencesPage = () => {
                             แก้ไข
                         </Button>
                     </Tooltip>
+                    {!record.is_reference && (
+                        <>
+                            <Divider type="vertical" />
+                            <Tooltip title="คัดลอกไปเป็นข้อมูลอ้างอิง">
+                                <Button type="text" icon={<CopyOutlined />} onClick={() => handleOpenCloneModal(record)}>
+                                    เพิ่มเป็นข้อมูลอ้างอิง
+                                </Button>
+                            </Tooltip>
+                        </>
+                    )}
                     <Divider type="vertical" />
                     <Popconfirm
-                        title="ลบข้อมูลอ้างอิงนี้?"
+                        title="ลบรายการประเมินนี้?"
                         description="คุณแน่ใจหรือไม่ว่าต้องการลบรายการนี้? การกระทำนี้ไม่สามารถย้อนกลับได้"
                         onConfirm={() => handleDelete(record.id)}
                         okText="ใช่, ลบ"
@@ -157,13 +159,13 @@ const ReferencesPage = () => {
         }
     };
 
-    const handleModalSubTasksChange = (newSubTasks: any[]) => {
+    const handleModalSubTasksChange = (newSubTasks: (SubTask & { key?: React.Key })[]) => {
         if (!selectedRecord) return;
         const newCost = newSubTasks.reduce((sum, task) => sum + (parseFloat(String(task.Days)) || 0), 0);
         setSelectedRecord({
             ...selectedRecord,
             sub_tasks: newSubTasks,
-            cost: newCost,
+            cost: String(newCost),
         });
         form.setFieldsValue({ cost: newCost });
     };
@@ -171,20 +173,20 @@ const ReferencesPage = () => {
     const subTaskColumns = [
         { title: 'Sub-Task', dataIndex: 'Sub-Task', key: 'sub-task', width: '25%', editable: true },
         { title: 'Description', dataIndex: 'Description', key: 'description', editable: true },
-        { title: 'Days', dataIndex: 'Days', key: 'days', width: '10%', editable: true, render: (days: any) => parseFloat(String(days || '0')).toFixed(2) },
+        { title: 'Days', dataIndex: 'Days', key: 'days', width: '10%', editable: true, render: (days: number | string) => parseFloat(String(days || '0')).toFixed(2) },
         {
             title: 'Action',
             dataIndex: 'action',
             width: '15%',
-            render: (_: any, record: any) => {
+            render: (_: unknown, record: SubTask & { key: React.Key }) => {
                 const editable = isEditing(record);
                 return editable ? (
                     <span>
                         <Typography.Link onClick={() => saveSubTask(record.key)} style={{ marginRight: 8 }}>
-                            บันทึก
+                            Save
                         </Typography.Link>
-                        <Popconfirm title="ยกเลิกการแก้ไข?" onConfirm={() => setEditingKey('')}>
-                            <a>ยกเลิก</a>
+                        <Popconfirm title="Sure to cancel?" onConfirm={() => setEditingKey('')}>
+                            <a>Cancel</a>
                         </Popconfirm>
                     </span>
                 ) : (
@@ -193,8 +195,8 @@ const ReferencesPage = () => {
                             Edit
                         </Typography.Link>
                         <Divider type="vertical" />
-                        <Popconfirm title="ลบรายการย่อยนี้?" onConfirm={() => deleteSubTask(record.key)}>
-                            <a style={{ color: 'red' }}>ลบ</a>
+                        <Popconfirm title="Sure to delete?" onConfirm={() => deleteSubTask(record.key)}>
+                            <a style={{ color: 'red' }}>Delete</a>
                         </Popconfirm>
                     </Space>
                 );
@@ -202,21 +204,21 @@ const ReferencesPage = () => {
         },
     ];
 
-    const editSubTask = (record: any) => {
-        subTaskForm.setFieldsValue({ ...record });
-        setEditingKey(record.key);
+    const editSubTask = (record: SubTask & { key: React.Key }) => {
+        subTaskForm.setFieldsValue({ ...record }); // Use the sub-task form
+        setEditingKey(String(record.key));
     };
 
     const deleteSubTask = (key: React.Key) => {
-        const newSubTasks = selectedRecord?.sub_tasks.filter((item: any, index) => (item['Sub-Task'] || `task-${index}`) !== key) || [];
-        handleModalSubTasksChange(newSubTasks);
+        const newSubTasks = (selectedRecord?.sub_tasks as (SubTask & { key?: React.Key })[])?.filter(item => item.key !== key) || [];
+        handleModalSubTasksChange(newSubTasks); // This will update the state
     };
 
     const saveSubTask = async (key: React.Key) => {
         try {
-            const row = await subTaskForm.validateFields();
-            const newSubTasks = [...(selectedRecord?.sub_tasks || [])];
-            const index = newSubTasks.findIndex((item: any, idx) => (item['Sub-Task'] || `task-${idx}`) === key);
+            const row = await subTaskForm.validateFields(); // Validate the sub-task form
+            const newSubTasks: (SubTask & { key?: React.Key })[] = [...(selectedRecord?.sub_tasks || [])];
+            const index = newSubTasks.findIndex((item: SubTask & { key?: React.Key }) => item.key === key);
             if (index > -1) {
                 newSubTasks[index] = { ...newSubTasks[index], ...row };
                 handleModalSubTasksChange(newSubTasks);
@@ -229,7 +231,7 @@ const ReferencesPage = () => {
 
     const addNewSubTask = () => {
         const newKey = `new-task-${Date.now()}`;
-        const newSubTask = { 'Sub-Task': newKey, Description: '', Days: 0, key: newKey };
+        const newSubTask: SubTask & { key: React.Key } = { 'Sub-Task': newKey, Description: '', Days: 0, key: newKey };
         handleModalSubTasksChange([...(selectedRecord?.sub_tasks || []), newSubTask]);
         editSubTask(newSubTask);
     };
@@ -238,50 +240,47 @@ const ReferencesPage = () => {
         <>
             <Space direction="vertical" size="large" style={{ display: 'flex' }}>
                 <Card>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Title level={2} style={{ margin: 0 }}>การจัดการข้อมูลอ้างอิง</Title>
-                        <Space>
-                            <Search
-                                placeholder="ค้นหาด้วยชื่อฟังก์ชัน..."
-                                onSearch={(value) => setSearchTerm(value)}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                style={{ width: 300 }}
-                                allowClear
-                            />
-                            <Button onClick={() => handleExportCSV(referenceHistory)} disabled={referenceHistory.length === 0}>
-                                ส่งออกเป็น CSV
-                            </Button>
-                            <Button type="primary" onClick={handleOpenNewReferenceModal} >
-                                + เพิ่มข้อมูลอ้างอิงใหม่
-                            </Button>
-                        </Space>
-                    </div>
+                    <Title level={2} style={{ margin: 0 }}>
+                        History for: {selectedProject ? selectedProject.name_en : 'No Project Selected'}
+                    </Title>
+                    <Paragraph type="secondary">
+                        This page shows the estimation history for the currently selected project.
+                        Please select a project from the dropdown in the header to view its history.
+                    </Paragraph>
                 </Card>
                 {error && <Alert message="Error" description={error} type="error" showIcon />}
                 <Card>
-                    <Spin spinning={loading} tip="Loading references...">
-                        <Table columns={columns} dataSource={referenceHistory} rowKey="id" pagination={{ pageSize: 10 }} />
+                    <Spin spinning={loading} tip="Loading history...">
+                        <Table
+                            columns={columns}
+                            dataSource={nonReferenceHistory.filter(h => h.project_id === selectedProject?.id)}
+                            rowKey="id"
+                            pagination={{ pageSize: 10 }}
+                            locale={{
+                                emptyText: selectedProject ? 'No history found for this project.' : 'Please select a project to view its history.'
+                            }}
+                        />
                     </Spin>
                 </Card>
             </Space>
             <Modal
                 title={
-                    modalMode === 'new' ? 'สร้างข้อมูลอ้างอิงใหม่' :
-                        `แก้ไขรายละเอียด: ${selectedRecord?.function_name}`
+                    modalMode === 'clone' ? `Clone to Reference: ${selectedRecord?.function_name}` :
+                        `Edit Details: ${selectedRecord?.function_name}`
                 }
                 open={isModalVisible}
                 onCancel={handleCancelModal}
                 footer={[
                     <Button key="back" onClick={handleCancelModal}>
-                        ยกเลิก
+                        Cancel
                     </Button>,
-                    (modalMode === 'new') ? (
+                    (modalMode === 'clone') ? (
                         <Button key="clone" type="primary" loading={isSaving} onClick={handleModalSave}>
-                            บันทึกเป็นข้อมูลอ้างอิงใหม่
+                            Save as New Reference
                         </Button>
                     ) : (
-                        <Button key="submit" type="primary" loading={isSaving} onClick={handleModalSave} >
-                            บันทึกการเปลี่ยนแปลง
+                        <Button key="submit" type="primary" loading={isSaving} onClick={handleModalSave}>
+                            Save Changes
                         </Button>
                     ),
                 ]}
@@ -290,7 +289,7 @@ const ReferencesPage = () => {
             >
                 {selectedRecord && (
                     <Form form={form} layout="vertical" initialValues={selectedRecord}>
-                        <Form.Item name="function_name" label="Function Name" rules={[{ required: true }]}>
+                        <Form.Item name="function_name" label="Function Name" rules={[{ required: true }]} >
                             <Input />
                         </Form.Item>
                         <Form.Item name="feature_description" label="Feature Description" rules={[{ required: true }]}>
@@ -308,7 +307,7 @@ const ReferencesPage = () => {
                                     if (!('editable' in col && col.editable)) return col;
                                     return {
                                         ...col,
-                                        onCell: (record: any) => ({
+                                        onCell: (record: SubTask & { key: React.Key }) => ({
                                             record,
                                             inputType: col.dataIndex === 'Days' ? 'number' : 'text',
                                             dataIndex: col.dataIndex,
@@ -318,13 +317,14 @@ const ReferencesPage = () => {
                                     };
                                 })}
                                 dataSource={selectedRecord.sub_tasks.map((t, i) => ({ ...t, key: t['Sub-Task'] || `task-${i}` }))}
+                                rowKey="key"
                                 pagination={false}
                                 size="small"
                                 bordered
                             />
                         </Form>
                         <Button onClick={addNewSubTask} style={{ marginTop: 16 }}>
-                            เพิ่มงานย่อยใหม่
+                            Add New Sub-task
                         </Button>
                         <div className="text-right mt-4">
                             <Text strong>Total Estimated Days: </Text>
@@ -339,4 +339,4 @@ const ReferencesPage = () => {
     );
 };
 
-export default ReferencesPage;
+export default HistoryPage;

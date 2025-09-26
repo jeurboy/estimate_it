@@ -88,8 +88,9 @@ export const useHistoryPage = () => {
         try {
             const historyData = await fetchHistoryAPI(search);
             dispatch({ type: 'FETCH_SUCCESS', payload: historyData });
-        } catch (err: any) {
-            dispatch({ type: 'FETCH_ERROR', payload: err.message });
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+            dispatch({ type: 'FETCH_ERROR', payload: errorMessage });
         }
     }, []);
 
@@ -136,9 +137,10 @@ export const useHistoryPage = () => {
         dispatch({ type: 'DELETE_SUCCESS', payload: id }); // Optimistic update
         try {
             await deleteHistoryAPI(id);
-        } catch (err: any) {
+        } catch (err: unknown) {
             dispatch({ type: 'FETCH_SUCCESS', payload: originalHistory }); // Revert on error
-            dispatch({ type: 'SAVE_ERROR', payload: err.message });
+            const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+            dispatch({ type: 'SAVE_ERROR', payload: errorMessage });
         }
     };
 
@@ -191,8 +193,9 @@ export const useHistoryPage = () => {
             const savedData = await response.json();
             dispatch(isNew ? { type: 'SAVE_SUCCESS', payload: savedData } : { type: 'UPDATE_SUCCESS', payload: savedData });
             handleCancelModal();
-        } catch (err: any) {
-            dispatch({ type: 'SAVE_ERROR', payload: err.message });
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+            dispatch({ type: 'SAVE_ERROR', payload: errorMessage });
         }
     };
 

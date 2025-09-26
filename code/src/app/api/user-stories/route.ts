@@ -14,7 +14,7 @@ export async function GET(request: Request) {
         const stories = await listUserStoriesByProject(projectId);
         return NextResponse.json({ stories });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         return createErrorResponse(error, 'GET /api/user-stories');
     }
 }
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
         const newStory = await createUserStory(projectId, storyText, featureName);
         return NextResponse.json(newStory, { status: 201 });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         return createErrorResponse(error, 'POST /api/user-stories');
     }
 }

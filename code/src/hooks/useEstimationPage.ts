@@ -111,8 +111,9 @@ export default function useEstimationPage() {
                 } else {
                     addMessage('error', 'Could not fetch reference tasks. Proceeding without examples.');
                 }
-            } catch (similarError: any) {
-                addMessage('error', `Error fetching reference tasks: ${similarError.message}. Proceeding without examples.`);
+            } catch (similarError: unknown) {
+                const errorMessage = similarError instanceof Error ? similarError.message : String(similarError);
+                addMessage('error', `Error fetching reference tasks: ${errorMessage}. Proceeding without examples.`);
             }
             // --- End of T011 logic ---
 
@@ -170,13 +171,15 @@ export default function useEstimationPage() {
                         setSuggestedStory(suggested);
                         addMessage('status', 'User story suggestion ready.');
                     }
-                } catch (suggestError: any) {
+                } catch (suggestError: unknown) {
                     // This is a non-critical error, so we just log it without failing the whole process
-                    console.error("Could not generate story suggestion:", suggestError.message);
+                    const errorMessage = suggestError instanceof Error ? suggestError.message : String(suggestError);
+                    console.error("Could not generate story suggestion:", errorMessage);
                 }
             }
-        } catch (err: any) {
-            addMessage('error', `An error occurred: ${err.message}`);
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : String(err);
+            addMessage('error', `An error occurred: ${errorMessage}`);
         } finally {
             setIsLoading(false);
         }
@@ -241,8 +244,9 @@ export default function useEstimationPage() {
             }
             setMessages((prev) => [...prev, { type: 'status', text: successMessage }]);
             return historyRecordPromise ? savedHistory : null;
-        } catch (err: any) {
-            setMessages((prev) => [...prev, { type: 'error', text: `Save failed: ${err.message}` }]);
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : String(err);
+            setMessages((prev) => [...prev, { type: 'error', text: `Save failed: ${errorMessage}` }]);
             return null;
         } finally {
             setIsSaving(false);
@@ -288,6 +292,8 @@ export default function useEstimationPage() {
         results,
         systemPrompt,
         setSystemPrompt,
+        lastPrompt,
+        rawResponse,
         projectDescription,
         setProjectDescription,
         suggestedStory,

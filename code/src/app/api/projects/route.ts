@@ -6,7 +6,7 @@ export async function GET() {
     try {
         const projects = await listProjects();
         return NextResponse.json({ projects });
-    } catch (error: any) {
+    } catch (error: unknown) {
         return createErrorResponse(error, 'GET /api/projects');
     }
 }
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json(newProject, { status: 201 });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         return createErrorResponse(error, 'POST /api/projects');
     }
 }

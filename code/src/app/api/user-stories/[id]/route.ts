@@ -1,13 +1,15 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { updateUserStory, deleteUserStory } from '@/lib/db/userStories';
 import { createErrorResponse } from '@/lib/utils/normalize';
 
 export async function PUT(
-    request: Request,
-    { params }: { params: { id: string } }
+    request: NextRequest,
+    context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params; // Await the params promise
+    const { id } = params; // Now you can safely access id
+
     try {
-        const id = params.id;
         const body = await request.json();
         const { storyText } = body;
 
@@ -21,17 +23,18 @@ export async function PUT(
         const updatedRecord = await updateUserStory(id, storyText);
         return NextResponse.json(updatedRecord);
 
-    } catch (error: any) {
-        return createErrorResponse(error, `PUT /api/user-stories/${params.id}`);
+    } catch (error: unknown) {
+        return createErrorResponse(error, `PUT /api/user-stories/${id}`);
     }
 }
 
 export async function DELETE(
-    request: Request,
-    { params }: { params: { id: string } }
+    request: NextRequest,
+    context: { params: Promise<{ id: string }> }
 ) {
+    const params = await context.params; // Await the params promise
+    const { id } = params; // Now you can safely access id
     try {
-        const id = params.id;
 
         if (!id) {
             return NextResponse.json({ error: 'User Story ID is required.' }, { status: 400 });
@@ -45,8 +48,7 @@ export async function DELETE(
 
         return NextResponse.json({ message: 'User Story deleted successfully.', deletedRecord });
 
-    } catch (error: any) {
-        return createErrorResponse(error, `DELETE /api/user-stories/${params.id}`);
+    } catch (error: unknown) {
+        return createErrorResponse(error, `DELETE /api/user-stories/${id}`);
     }
 }
-

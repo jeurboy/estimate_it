@@ -13,17 +13,13 @@ interface ResultsTableProps {
 
 const { Text, Title } = Typography;
 
-interface EditableColumnType extends TableColumnType<SubTask> {
-    editable?: boolean;
-}
-
-interface EditableCellProps extends React.HTMLAttributes<HTMLElement> {
+interface EditableCellProps {
     editing: boolean;
     dataIndex: keyof SubTask;
-    title: any;
+    title: string;
     inputType: 'number' | 'text';
     record: SubTask;
-    index: number;
+    children?: React.ReactNode;
 }
 
 const EditableCell: React.FC<React.PropsWithChildren<EditableCellProps>> = ({
@@ -31,15 +27,12 @@ const EditableCell: React.FC<React.PropsWithChildren<EditableCellProps>> = ({
     dataIndex,
     title,
     inputType,
-    record,
-    index,
     children,
-    ...restProps
 }) => {
     const inputNode = inputType === 'number' ? <InputNumber step="0.1" /> : <Input.TextArea autoSize={{ minRows: 1 }} />;
 
     return (
-        <td {...restProps}>
+        <td>
             {editing ? (
                 <Form.Item
                     name={dataIndex}
@@ -61,12 +54,12 @@ const EditableCell: React.FC<React.PropsWithChildren<EditableCellProps>> = ({
 };
 
 export default function ResultsTable({ subTasks, cost, onSubTasksChange }: ResultsTableProps) {
+    const [form] = Form.useForm();
+    const [editingKey, setEditingKey] = useState<React.Key>('');
+
     if (!subTasks || subTasks.length === 0) {
         return null;
     }
-
-    const [form] = Form.useForm();
-    const [editingKey, setEditingKey] = useState<React.Key>('');
 
     const isEditing = (record: SubTask) => record['Sub-Task'] === editingKey;
 
@@ -110,7 +103,7 @@ export default function ResultsTable({ subTasks, cost, onSubTasksChange }: Resul
         edit({ ...newTask, 'Sub-Task': newKey }); // Put the new row into edit mode
     };
 
-    const columns: EditableColumnType[] = [
+    const columns: (TableColumnType<SubTask> & { editable?: boolean; dataIndex?: keyof SubTask })[] = [
         {
             title: 'Sub-Task',
             dataIndex: 'Sub-Task',
@@ -129,14 +122,14 @@ export default function ResultsTable({ subTasks, cost, onSubTasksChange }: Resul
             width: '10%',
             align: 'center',
             editable: true,
-            render: (days: any) => parseFloat(String(days || '0')).toFixed(2),
+            render: (days: number) => parseFloat(String(days || '0')).toFixed(2),
         },
         {
             title: 'Action',
-            dataIndex: 'action',
+            key: 'action',
             width: '10%',
             align: 'center',
-            render: (_: any, record: SubTask) => {
+            render: (_: unknown, record: SubTask) => {
                 const editable = isEditing(record);
                 return editable ? (
                     <span>
@@ -165,8 +158,8 @@ export default function ResultsTable({ subTasks, cost, onSubTasksChange }: Resul
             onCell: (record: SubTask) => ({
                 record,
                 inputType: col.dataIndex === 'Days' ? 'number' : 'text',
-                dataIndex: col.dataIndex,
-                title: col.title,
+                dataIndex: col.dataIndex as keyof SubTask,
+                title: String(col.title), // Ensure title is a string for the validation message
                 editing: isEditing(record),
             }),
         };

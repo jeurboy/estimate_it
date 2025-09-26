@@ -4,7 +4,7 @@ import * as schema from './schema';
 
 // This is a workaround to declare a global variable in TypeScript for the connection pool.
 declare global {
-    // eslint-disable-next-line no-var
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     var dbPool: Pool | undefined;
 }
 

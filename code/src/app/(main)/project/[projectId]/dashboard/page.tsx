@@ -11,6 +11,11 @@ import { Bar } from '@ant-design/charts';
 
 const { Title, Paragraph } = Typography;
 
+interface DistributionData {
+    range: string;
+    count: number;
+}
+
 const DashboardPage = () => {
     const { selectedProject, setSelectedProject, setProjects } = useProject();
     // Define a color palette for charts
@@ -21,8 +26,8 @@ const DashboardPage = () => {
     const [taskCount, setTaskCount] = useState(0);
     const [subTaskCount, setSubTaskCount] = useState(0);
     const [totalManDays, setTotalManDays] = useState(0);
-    const [taskDistributionData, setTaskDistributionData] = useState<any[]>([]);
-    const [taskCostDistributionData, setTaskCostDistributionData] = useState<any[]>([]);
+    const [taskDistributionData, setTaskDistributionData] = useState<DistributionData[]>([]);
+    const [taskCostDistributionData, setTaskCostDistributionData] = useState<DistributionData[]>([]);
     const pathname = usePathname();
     const isMobile = useIsMobile();
 

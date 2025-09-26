@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 const { Text } = Typography;
 
 export default function ProjectSelector() {
-    const { selectedProject, setSelectedProject, projects, loading } = useProject();
+    const { selectedProject, setSelectedProject, projects } = useProject();
 
     const handleChange = (projectId: string) => {
         const project = projects.find(p => p.id === projectId) || null;
@@ -22,7 +22,6 @@ export default function ProjectSelector() {
                 placeholder="Select a project"
                 value={selectedProject?.id}
                 onChange={handleChange}
-                loading={loading}
                 options={projects.map(p => ({ value: p.id, label: p.name_en }))}
                 allowClear
                 onClear={() => setSelectedProject(null)}

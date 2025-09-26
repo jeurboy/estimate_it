@@ -2,6 +2,7 @@ import { POST, GET } from './route';
 import { getEmbedding } from '@/lib/services/embeddingService';
 import { saveEstimation, listEstimations } from '@/lib/db/history';
 import { NextRequest } from 'next/server';
+import { EstimationHistory } from '@/lib/db/schema';
 
 // Mock services
 jest.mock('@/lib/services/embeddingService');
@@ -20,11 +21,13 @@ describe('/api/history API Endpoint', () => {
     describe('POST', () => {
         it('should save an estimation and return 201', async () => {
             const mockBody = {
-                projectName: 'Test Project',
+                projectId: 'proj-123',
+                sourceProjectId: null,
+                functionName: 'Test Function',
                 featureDescription: 'Test Feature',
                 systemPrompt: 'Test Prompt',
                 subTasks: [],
-                cost: 1.0,
+                cost: 1.0, // The API receives a number
                 isReference: true,
             };
             const mockVector = [0.1, 0.2];
@@ -45,7 +48,14 @@ describe('/api/history API Endpoint', () => {
             expect(responseBody).toEqual(mockSavedRecord);
             expect(mockGetEmbedding).toHaveBeenCalledWith(mockBody.featureDescription);
             expect(mockSaveEstimation).toHaveBeenCalledWith({
-                ...mockBody,
+                projectId: mockBody.projectId,
+                sourceProjectId: mockBody.sourceProjectId,
+                functionName: mockBody.functionName,
+                featureDescription: mockBody.featureDescription,
+                systemPrompt: mockBody.systemPrompt,
+                subTasks: mockBody.subTasks,
+                cost: String(mockBody.cost), // The DB service receives a string
+                isReference: mockBody.isReference,
                 descriptionVector: mockVector,
             });
         });
@@ -63,8 +73,20 @@ describe('/api/history API Endpoint', () => {
 
     describe('GET', () => {
         it('should return a list of history items', async () => {
-            const mockHistory = [{ id: 'uuid-1', project_name: 'Project A' }];
-            mockListEstimations.mockResolvedValue(mockHistory as any);
+            const mockHistory: EstimationHistory[] = [{
+                id: 'uuid-1',
+                project_id: 'proj-1',
+                source_project_id: null,
+                function_name: 'Function A',
+                feature_description: 'Desc A',
+                system_prompt: 'Prompt A',
+                sub_tasks: [],
+                cost: '5.00',
+                is_reference: false,
+                description_vector: [0.1],
+                created_at: new Date(),
+            }];
+            mockListEstimations.mockResolvedValue(mockHistory);
 
             const request = new NextRequest('http://localhost/api/history');
             const response = await GET(request);
@@ -76,8 +98,20 @@ describe('/api/history API Endpoint', () => {
         });
 
         it('should handle search query parameter', async () => {
-            const mockHistory = [{ id: 'uuid-2', project_name: 'Searchable Project' }];
-            mockListEstimations.mockResolvedValue(mockHistory as any);
+            const mockHistory: EstimationHistory[] = [{
+                id: 'uuid-2',
+                project_id: 'proj-2',
+                source_project_id: null,
+                function_name: 'Searchable Function',
+                feature_description: 'Desc B',
+                system_prompt: 'Prompt B',
+                sub_tasks: [],
+                cost: '10.00',
+                is_reference: false,
+                description_vector: [0.2],
+                created_at: new Date(),
+            }];
+            mockListEstimations.mockResolvedValue(mockHistory);
 
             const request = new NextRequest('http://localhost/api/history?search=Searchable');
             const response = await GET(request);

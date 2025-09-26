@@ -49,14 +49,14 @@ export async function POST(request: Request) {
             systemPrompt,
             subTasks,
             isReference,
-            cost,
+            cost: String(cost),
             descriptionVector,
         });
 
         // 3. Return the newly created record with a 201 status.
         return NextResponse.json(savedRecord, { status: 201 });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         return createErrorResponse(error, 'POST /api/history');
     }
 }
@@ -72,7 +72,7 @@ export async function GET(request: Request) {
         // 2. Return the list of historical records.
         return NextResponse.json({ history });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         return createErrorResponse(error, 'GET /api/history');
     }
 }

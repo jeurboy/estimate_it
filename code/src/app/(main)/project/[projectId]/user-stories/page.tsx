@@ -29,8 +29,9 @@ const UserStoryPage = () => {
                 if (!response.ok) throw new Error('Failed to fetch user stories');
                 const data = await response.json();
                 setStories(data.stories || []);
-            } catch (err: any) {
-                setError(err.message);
+            } catch (err: unknown) {
+                const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+                setError(errorMessage);
             } finally {
                 setLoading(false);
             }
@@ -56,8 +57,9 @@ const UserStoryPage = () => {
             if (!response.ok) throw new Error('Failed to delete user story');
             setStories(stories.filter(s => s.id !== id));
             message.success('User story deleted successfully.');
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+            setError(errorMessage);
         }
     };
 
@@ -93,8 +95,9 @@ const UserStoryPage = () => {
             setIsModalVisible(false);
             message.success(`User story ${editingStory ? 'updated' : 'created'} successfully.`);
 
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
+            setError(errorMessage);
         }
     };
 
