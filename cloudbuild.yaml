@@ -26,3 +26,9 @@ options:
 # Store the image in Artifact Registry
 images:
 - 'asia-southeast1-docker.pkg.dev/$PROJECT_ID/estimate-it/${_SERVICE_NAME}:$SHORT_SHA'
+
+# ตัวแปรที่สามารถกำหนดค่าได้ตอนสร้าง Trigger
+substitutions:
+  _SERVICE_NAME: 'time-estimation-service' # เปลี่ยนเป็นชื่อบริการของคุณ
+  _REGION: 'asia-southeast1' # เปลี่ยนเป็น Region ที่คุณใช้
+  _DB_INSTANCE_NAME: 'cpmatch-project:asia-southeast1:jeurboy-db' # ใส่ชื่อ Cloud SQL Instance ของคุณ
