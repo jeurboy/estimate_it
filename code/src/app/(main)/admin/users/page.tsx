@@ -73,7 +73,7 @@ const UserManagementPage = () => {
         } catch (err: unknown) {
             // The useApi hook will set the error state
         }
-    }, [apiFetch, pagination.current, pagination.pageSize]);
+    }, [apiFetch, pagination]);
 
     useEffect(() => {
         fetchUsers(); // eslint-disable-next-line react-hooks/exhaustive-deps
