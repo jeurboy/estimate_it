@@ -61,7 +61,10 @@ const UserManagementPage = () => {
 
             if (usersRes) {
                 setUsers(usersRes.users);
-                setPagination(prev => ({ ...prev, total: usersRes.totalCount }));
+                // Only update total if it has changed to prevent re-renders
+                if (usersRes.totalCount !== pagination.total) {
+                    setPagination(prev => ({ ...prev, total: usersRes.totalCount }));
+                }
             }
             if (orgsRes) {
                 setOrganizations(orgsRes);
@@ -73,11 +76,11 @@ const UserManagementPage = () => {
         } catch (err: unknown) {
             // The useApi hook will set the error state
         }
-    }, [apiFetch, pagination]);
+    }, [apiFetch, pagination.current, pagination.pageSize, pagination.total]);
 
     useEffect(() => {
-        fetchUsers(); // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [fetchUsers]);
+        fetchUsers();
+    }, [fetchUsers]); // fetchUsers is now stable
 
     const userRolesForSelect = useMemo(() => {
         if (currentUser?.role === 'superadmin') {
