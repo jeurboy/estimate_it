@@ -7,6 +7,7 @@ import { FileTextOutlined, CalculatorOutlined, ClockCircleOutlined, BarChartOutl
 import { useParams, useRouter } from 'next/navigation';
 import { useApi } from '@/hooks/useApi';
 import { EstimationHistory } from '@/lib/db/schema';
+import { withAuth } from '@/hoc/withAuth';
 import { format } from 'date-fns';
 
 const { Title } = Typography;
@@ -16,12 +17,16 @@ interface TrendData {
     totalMandays: number;
 }
 
+interface RecentHistoryItem extends EstimationHistory {
+    userStoryFeatureName: string | null;
+}
+
 interface DashboardData {
     storyCount: number;
     totalTasks: number;
     totalMandays: number;
     averageMandays: number;
-    recentHistory: EstimationHistory[];
+    recentHistory: RecentHistoryItem[];
     estimationTrend: TrendData[];
 }
 
@@ -49,6 +54,12 @@ const ProjectDashboardPage = () => {
             title: 'Task / Feature Name',
             dataIndex: 'function_name',
             key: 'function_name',
+        },
+        {
+            title: 'User Story',
+            dataIndex: 'userStoryFeatureName',
+            key: 'userStoryFeatureName',
+            render: (text: string | null) => text ? <Tag>{text}</Tag> : <Typography.Text type="secondary">-</Typography.Text>,
         },
         {
             title: 'Estimated Man-days',
@@ -122,26 +133,8 @@ const ProjectDashboardPage = () => {
                     }}
                 />
             </Card>
-
-            <Card style={{ marginTop: 24 }}>
-                <Title level={4}>Man-day Estimation Trend</Title>
-                {dashboardData.estimationTrend && dashboardData.estimationTrend.length > 1 ? (
-                    <Line
-                        data={dashboardData.estimationTrend}
-                        xField="date"
-                        yField="totalMandays"
-                        height={300}
-                        point={{ size: 4, shape: 'circle' }}
-                        yAxis={{ title: { text: 'Total Man-days Estimated' } }}
-                        xAxis={{ title: { text: 'Date' }, type: 'time' }}
-                        tooltip={{ title: (d) => format(new Date(d), 'dd MMM yyyy') }}
-                    />
-                ) : (
-                    <Alert message="Not enough data to display trend chart. At least two days with estimations are required." type="info" showIcon />
-                )}
-            </Card>
         </div>
     );
 };
 
-export default ProjectDashboardPage;
+export default withAuth(ProjectDashboardPage);

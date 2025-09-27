@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { Table, Typography, Tag, Alert, Spin, Breadcrumb, Button, Modal, Form, Input, Select, message, Space, Popconfirm } from 'antd';
+import { Table, Typography, Tag, Alert, Spin, Button, Modal, Form, Input, Select, message, Space, Popconfirm } from 'antd';
 import type { TableProps } from 'antd';
 import { format } from 'date-fns';
 import { useApi } from '@/hooks/useApi';
@@ -203,13 +203,7 @@ const UserManagementPage = () => {
     ];
 
     return (
-        <div style={{ padding: '24px' }}>
-            <Breadcrumb
-                style={{ marginBottom: 16 }}
-                items={[
-                    { title: <Link href="/admin">Admin</Link> },
-                    { title: 'User Management' },
-                ]} />
+        <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                 <Title level={2} style={{ margin: 0 }}>User Management</Title>
                 {currentUser?.role === 'superadmin' && (

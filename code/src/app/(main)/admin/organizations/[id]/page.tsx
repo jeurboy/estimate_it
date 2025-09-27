@@ -2,9 +2,10 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { Table, Typography, Tag, Alert, Spin, Breadcrumb, Descriptions, Card } from 'antd';
+import { Table, Typography, Tag, Alert, Spin, Breadcrumb, Space, Card, Row, Col, Statistic } from 'antd';
 import type { TableProps } from 'antd';
 import { format } from 'date-fns';
+import { HomeOutlined, UserOutlined, AppstoreOutlined } from '@ant-design/icons';
 import { useApi } from '@/hooks/useApi';
 import Link from 'next/link';
 
@@ -82,7 +83,28 @@ const OrganizationDetailPage = () => {
             title: 'Joined At',
             dataIndex: 'createdAt',
             key: 'createdAt',
-            render: (date: string) => format(new Date(date), 'dd MMM yyyy, HH:mm'),
+            render: (date: string) => date ? format(new Date(date), 'dd MMM yyyy, HH:mm') : '-',
+        },
+    ];
+
+    const projectColumns: TableProps<Project>['columns'] = [
+        {
+            title: 'Project Name',
+            dataIndex: 'name_en',
+            key: 'name_en',
+            render: (text, record) => <Link href={`/project/${record.id}/dashboard`}>{text}</Link>,
+        },
+        {
+            title: 'Description',
+            dataIndex: 'description',
+            key: 'description',
+            ellipsis: true,
+        },
+        {
+            title: 'Created At',
+            dataIndex: 'created_at',
+            key: 'created_at',
+            render: (date: string) => date ? format(new Date(date), 'dd MMM yyyy') : '-',
         },
     ];
 
@@ -95,31 +117,30 @@ const OrganizationDetailPage = () => {
     }
 
     return (
-        <div style={{ padding: '24px' }}>
-            <Breadcrumb
-                style={{ marginBottom: 16 }}
-                items={[
-                    { title: <Link href="/admin/organizations">Organizations</Link> },
-                    { title: organization?.name_en || 'Details' },
-                ]}
-            />
+        <div>
             <Title level={2}>{organization?.name_en}</Title>
             <p>{organization?.name_th}</p>
             <p>{organization?.description}</p>
 
+            <Row gutter={16} style={{ marginTop: 24 }}>
+                <Col xs={24} sm={12}>
+                    <Card>
+                        <Statistic
+                            title="Total Users"
+                            value={users.length}
+                            prefix={<UserOutlined />}
+                        />
+                    </Card>
+                </Col>
+                <Col xs={24} sm={12}>
+                    <Card>
+                        <Statistic title="Total Projects" value={projects.length} prefix={<AppstoreOutlined />} />
+                    </Card>
+                </Col>
+            </Row>
+
             <Title level={3} style={{ marginTop: 32 }}>Projects</Title>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
-                {projects.length > 0 ? (
-                    projects.map(project => (
-                        <Card key={project.id} title={project.name_en} style={{ width: 300 }}>
-                            <p>{project.name_th}</p>
-                            <p>Duration: {project.duration_months} months</p>
-                        </Card>
-                    ))
-                ) : (
-                    <p>No projects found in this organization.</p>
-                )}
-            </div>
+            <Table columns={projectColumns} dataSource={projects} rowKey="id" pagination={{ pageSize: 5 }} />
 
             <Title level={3} style={{ marginTop: 32 }}>Users</Title>
             <Table columns={userColumns} dataSource={users} rowKey="id" pagination={{ pageSize: 5 }} />

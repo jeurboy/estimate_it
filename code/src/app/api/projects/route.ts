@@ -27,8 +27,10 @@ export async function GET(request: Request) {
 
         let whereCondition;
         if (userRole === 'admin' || userRole === 'user') {
-            // Admins and Users only see projects in their org, or unassigned projects if they are not in an org.
-            whereCondition = userOrgId ? eq(projects.organization_id, userOrgId) : isNull(projects.organization_id);
+            if (!userOrgId) {
+                return NextResponse.json({ error: 'Forbidden: Admins and Users must belong to an organization to view projects.' }, { status: 403 });
+            }
+            whereCondition = eq(projects.organization_id, userOrgId);
         }
         // Superadmin has no whereCondition, sees all
 

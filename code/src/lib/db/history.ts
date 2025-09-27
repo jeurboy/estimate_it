@@ -7,6 +7,7 @@ import pgvector from 'pgvector/pg';
 
 export interface SaveEstimationData {
     projectId: string | null;
+    userStoryId: string | null;
     sourceProjectId: string | null;
     functionName: string;
     featureDescription: string;
@@ -27,13 +28,14 @@ export async function saveEstimation(data: SaveEstimationData): Promise<Estimati
     try {
         const [savedRecord] = await db.insert(estimationHistory).values({
             project_id: data.projectId,
+            user_story_id: data.userStoryId,
             source_project_id: data.sourceProjectId,
             function_name: data.functionName,
             feature_description: data.featureDescription,
             system_prompt: data.systemPrompt,
             is_reference: data.isReference,
             sub_tasks: data.subTasks,
-            cost: data.cost,
+            cost: String(data.cost),
             // Drizzle pgvector handles the conversion automatically
             description_vector: data.descriptionVector,
         }).returning();

@@ -16,6 +16,7 @@ interface EstimationResult {
 export const DEFAULT_SYSTEM_PROMPT = `คุณคือผู้เชี่ยวชาญด้านการประเมินผลทางวิศวกรรมซอฟต์แวร์ (Software Engineering Estimator) ภารกิจหลักของคุณคือการแบ่งงานที่ผู้ใช้ร้องขอออกเป็นงานย่อยทางเทคนิค (sub-tasks) และประเมินจำนวนวันทำงาน (man-days) ที่ต้องใช้สำหรับแต่ละงานย่อย โดย 1 วันทำงานเท่ากับ 6 ชั่วโมง 'days' สำหรับแต่ละงานย่อยสามารถเป็นทศนิยมได้ (เช่น 0.5, 1.5) ผลลัพธ์ของคุณต้องเป็น JSON object ที่ถูกต้องเท่านั้น โดยมี 'subTasks' (อาร์เรย์ของอ็อบเจกต์ที่มี 'task', 'days', และ 'description') และ 'cost' (ตัวเลขที่แสดงจำนวน man-days ทั้งหมด) **สำคัญ: ค่าทั้งหมดใน JSON object ต้องเป็นภาษาไทย**`;
 const PROMPT_STORAGE_KEY = 'estimation_system_prompt';
 const PROJECT_DESC_STORAGE_KEY = 'estimation_project_description';
+const SUGGESTED_STORY_KEY_PREFIX = 'suggested_story_';
 
 /**
  * Formats historical estimation examples to be included in the system prompt.
@@ -34,7 +35,7 @@ ${JSON.stringify({ subTasks: p.sub_tasks.map(t => ({ 'Sub-Task': t['Sub-Task'], 
     return `\n\nHere are some examples of past estimations. Use them as a reference for style, structure, and complexity assessment:\n\n${examples}`;
 };
 
-export default function useEstimationPage() {
+export default function useEstimationPage(projectId?: string) {
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -44,6 +45,7 @@ export default function useEstimationPage() {
     const [rawResponse, setRawResponse] = useState<string | null>(null);
     const [projectDescription, setProjectDescription] = useState('');
     const [lastFeatureDescription, setLastFeatureDescription] = useState<string | null>(null);
+    const [sourceStoryId, setSourceStoryId] = useState<string | null>(null);
     const [suggestedStory, setSuggestedStory] = useState<{ featureName: string; storyText: string } | null>(null);
 
 
@@ -70,11 +72,17 @@ export default function useEstimationPage() {
         }
     }, [projectDescription]);
 
-    const handleEstimate = async (taskDescription: string, projectContextDescription: string, projectId: string | undefined, isFromSavedStory: boolean) => {
+    const handleEstimate = async (
+        taskDescription: string,
+        projectContextDescription: string,
+        projectId: string | undefined,
+        options: { isFromSavedStory: boolean; storyId?: string; isFromGeneratedStory?: boolean; }
+    ) => {
         setIsLoading(true);
         setMessages([]);
         setResults(null);
         setSuggestedStory(null);
+        setSourceStoryId(options.storyId ?? null); // Store the source story ID
 
         // Combine project context with the specific task for the full description
         const fullFeatureDescription = `Project Context:\n${projectDescription}\n\nTask to Estimate:\n${taskDescription}`;
@@ -158,7 +166,7 @@ export default function useEstimationPage() {
             setRawResponse(finalResult.rawResponse);
 
             // After successful estimation, try to generate a user story ONLY if the input was manual
-            if (!isFromSavedStory) {
+            if (!options.isFromSavedStory && !options.isFromGeneratedStory) {
                 try {
                     addMessage('status', 'Generating user story suggestion...');
                     const suggestRes = await fetch('/api/suggest-story', {
@@ -200,7 +208,8 @@ export default function useEstimationPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     projectId: pId,
-                    sourceProjectId: isRef ? projectId : null, // If saving as a reference, the source is the current project
+                    userStoryId: sourceStoryId, // Pass the stored story ID
+                    sourceProjectId: projectId, // The source is always the current project where estimation happens
                     functionName: functionName,
                     featureDescription: lastFeatureDescription,
                     systemPrompt: results.prompt,
@@ -296,6 +305,8 @@ export default function useEstimationPage() {
         rawResponse,
         projectDescription,
         setProjectDescription,
+        setSourceStoryId,
+        setSuggestedStory,
         suggestedStory,
         handleEstimate,
         handleResetPrompt,

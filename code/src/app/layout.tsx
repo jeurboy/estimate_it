@@ -1,29 +1,25 @@
 import React from 'react';
 import '@ant-design/v5-patch-for-react-19';
 import { AntdRegistry } from '@ant-design/nextjs-registry';
-import { Layout, Typography } from 'antd';
-import Link from 'next/link';
-import AppHeader from '@/components/AppHeader';
-import { ProjectProvider } from '@/contexts/ProjectContext';
-
-const { Title } = Typography;
+import { Layout } from 'antd';
+import { AuthProvider } from '@/contexts/AuthContext';
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // AuthProvider is now at the root, wrapping everything.
   return (
     <html lang="en">
       <body>
-        <ProjectProvider>
+        <AuthProvider>
           <AntdRegistry>
             <Layout style={{ minHeight: '100vh' }}>
-              <AppHeader />
-              <main style={{ padding: '24px 48px' }}>{children}</main>
+              {children}
             </Layout>
           </AntdRegistry>
-        </ProjectProvider>
+        </AuthProvider>
       </body>
     </html>
   );

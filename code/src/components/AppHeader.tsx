@@ -1,76 +1,97 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Menu, Layout, Typography, Skeleton } from 'antd';
+import React, { useState, useMemo } from 'react';
+import { Layout, Button, Avatar, Space, Typography, Dropdown, MenuProps, message, Menu, Divider } from 'antd';
+import { UserOutlined, LogoutOutlined, LoginOutlined, SettingOutlined } from '@ant-design/icons';
+import { useAuth } from '@/contexts/AuthContext';
+import LoginModal from './LoginModal';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import UserAuthStatus from './UserAuthStatus';
-import { usePathname } from 'next/navigation';
-import type { MenuProps } from 'antd';
 
 const { Header } = Layout;
-const { Title } = Typography;
+const { Text } = Typography;
 
-interface User {
-    email: string;
-    role: 'superadmin' | 'admin' | 'user';
-}
-
-export default function AppHeader() {
+const AppHeader = () => {
+    const { user, isAuthenticated, logout, checkUser } = useAuth();
+    const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+    const router = useRouter();
     const pathname = usePathname();
-    const [user, setUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const fetchUser = async () => {
-            try {
-                const response = await fetch('/api/auth/me');
-                if (response.ok) {
-                    const data = await response.json();
-                    setUser(data.user);
-                } else {
-                    setUser(null);
-                }
-            } catch (error) {
-                setUser(null);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchUser();
-    }, []);
+    const handleLogout = async () => {
+        try {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            logout(); // Clear user from context immediately
+            message.success('Logged out successfully.');
+            router.push('/dashboard'); // Navigate to dashboard, which will refetch data for guest
+        } catch (error) {
+            message.error('Logout failed.');
+        }
+    };
 
-    const getMenuItems = (): MenuProps['items'] => {
-        if (!user) return [];
+    const onLoginSuccess = async () => {
+        setIsLoginModalOpen(false);
+        message.success('Login successful!');
+        // Re-check user status to update the header and context.
+        // This will trigger useEffect in pages that depend on `isAuthenticated`.
+        await checkUser();
+    };
 
-        const menuItems: MenuProps['items'] = [
+    const userMenuItems: MenuProps['items'] = [
+        {
+            key: 'profile',
+            icon: <SettingOutlined />,
+            label: <Link href="/profile">Profile</Link>,
+        },
+        { type: 'divider' },
+        {
+            key: 'logout',
+            icon: <LogoutOutlined />,
+            label: 'Logout',
+            onClick: handleLogout,
+        },
+    ];
+
+    const navMenuItems = useMemo(() => {
+        if (!isAuthenticated || !user) return [];
+
+        const items: MenuProps['items'] = [
             { label: <Link href="/projects">Projects</Link>, key: '/projects' },
-            { label: <Link href="/references">References</Link>, key: '/references' },
         ];
 
         if (user.role === 'superadmin' || user.role === 'admin') {
-            menuItems.push({ label: <Link href="/admin/users">User Management</Link>, key: '/admin/users' });
+            items.push({ label: <Link href="/admin/users">User Management</Link>, key: '/admin/users' });
+            items.push({ label: <Link href="/references">References</Link>, key: '/references' });
         }
 
         if (user.role === 'superadmin') {
-            menuItems.push({ label: <Link href="/admin/organizations">Organizations</Link>, key: '/admin/organizations' });
+            items.push({ label: <Link href="/admin/organizations">Organizations</Link>, key: '/admin/organizations' });
         }
-
-        return menuItems;
-    };
+        return items;
+    }, [isAuthenticated, user]);
 
     return (
-        <Header style={{ display: 'flex', alignItems: 'center', backgroundColor: '#fff', borderBottom: '1px solid #f0f0f0', padding: '0 24px' }}>
-            <Link href="/" style={{ display: 'flex', alignItems: 'center', marginRight: '24px' }}>
-                <Title level={3} style={{ color: 'rgba(0, 0, 0, 0.88)', margin: 0, lineHeight: '1' }}>
-                    Estimate It
-                </Title>
-            </Link>
-            {loading ? (
-                <Skeleton.Input active size="small" style={{ width: 200, margin: 'auto 0' }} />
-            ) : (
-                <Menu selectedKeys={[pathname]} mode="horizontal" items={getMenuItems()} style={{ flex: 1, borderBottom: 'none', minWidth: 0 }} />
-            )}
-            <UserAuthStatus user={user} loading={loading} />
-        </Header>
+        <>
+            <Header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff', padding: '0 24px', borderBottom: '1px solid #f0f0f0' }}>
+                <Space>
+                    <Text strong style={{ fontSize: '20px' }}><Link href="/dashboard" style={{ color: 'inherit' }}>Estimate It</Link></Text>
+                    <Menu mode="horizontal" selectedKeys={[pathname]} items={navMenuItems} style={{ borderBottom: 'none', lineHeight: '62px' }} />
+                </Space>
+                <Space>
+                    {isAuthenticated && user ? (
+                        <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
+                            <Space style={{ cursor: 'pointer' }}>
+                                <Avatar icon={<UserOutlined />} />
+                                <Text>{user.email}</Text>
+                            </Space>
+                        </Dropdown>
+                    ) : (
+                        <Button icon={<LoginOutlined />} onClick={() => setIsLoginModalOpen(true)}>Login</Button>
+                    )}
+                </Space>
+            </Header>
+            <LoginModal open={isLoginModalOpen} onLoginSuccess={onLoginSuccess} onCancel={() => setIsLoginModalOpen(false)} />
+        </>
     );
-}
+};
+
+export default AppHeader;

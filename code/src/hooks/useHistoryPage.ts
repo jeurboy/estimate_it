@@ -106,6 +106,7 @@ export const useHistoryPage = () => {
         const newRecord: EstimationHistory = {
             id: '', // No ID for a new record,
             project_id: null,
+            user_story_id: null, // Manually created references don't have a user story
             source_project_id: null, // Manually created references have no source project
             function_name: '', // This will be filled in by the form
             feature_description: '',

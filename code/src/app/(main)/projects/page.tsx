@@ -137,8 +137,7 @@ const ProjectManagementPage = () => {
 
     return (
         <Space direction="vertical" size="large" style={{ display: 'flex' }}>
-            <Breadcrumb style={{ margin: '0 24px' }} items={[{ title: 'Project Management' }]} />
-            <Card>
+            <Card style={{ marginTop: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 24px' }}>
                     <Title level={2} style={{ margin: 0 }}>Project Management</Title>
                     {canCreate && (

@@ -8,6 +8,7 @@ import { vector } from 'drizzle-orm/pg-core';
 export interface EstimationHistory {
   id: string;
   project_id: string | null; // Can be null for global references
+  user_story_id: string | null; // Can be null for global references or tasks not tied to a story
   source_project_id: string | null; // For cloned references, which project did it come from?
   function_name: string;
   feature_description: string;
@@ -22,6 +23,7 @@ export interface EstimationHistory {
 export const estimation_history = pgTable('estimation_history', {
   id: uuid('id').primaryKey().defaultRandom(),
   project_id: uuid('project_id').references(() => projects.id, { onDelete: 'set null' }),
+  user_story_id: uuid('user_story_id').references(() => user_stories.id, { onDelete: 'set null' }),
   source_project_id: uuid('source_project_id').references(() => projects.id, { onDelete: 'set null' }),
   function_name: varchar('function_name', { length: 255 }).notNull(),
   feature_description: text('feature_description').notNull(),
@@ -42,6 +44,7 @@ export const schemaSQL = `
 CREATE TABLE IF NOT EXISTS estimation_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id UUID REFERENCES projects(id) ON DELETE SET NULL, -- Link to a project, can be null
+  user_story_id UUID REFERENCES user_stories(id) ON DELETE SET NULL, -- Link to a user story, can be null
   source_project_id UUID REFERENCES projects(id) ON DELETE SET NULL, -- For cloned references
   function_name VARCHAR(255) NOT NULL,
   feature_description TEXT NOT NULL,
@@ -52,6 +55,14 @@ CREATE TABLE IF NOT EXISTS estimation_history (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   description_vector VECTOR(768) -- Dimension for Google's text-embedding-004 model
 )`;
+
+/**
+ * The SQL for altering the estimation_history table to add the user_story_id column.
+ */
+export const estimationHistoryAlterSQL = `
+ALTER TABLE estimation_history
+ADD COLUMN user_story_id UUID REFERENCES user_stories(id) ON DELETE SET NULL;
+`;
 
 /**
  * Represents a single project in the database.

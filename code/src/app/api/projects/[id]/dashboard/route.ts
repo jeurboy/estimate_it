@@ -38,7 +38,12 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
                 totalTasks: count(),
                 totalMandays: sum(estimation_history.cost)
             }).from(estimation_history).where(and(eq(estimation_history.project_id, projectId), eq(estimation_history.is_reference, false))),
-            db.select().from(estimation_history).where(and(eq(estimation_history.project_id, projectId), eq(estimation_history.is_reference, false))).orderBy(desc(estimation_history.created_at)).limit(5),
+            db.select({
+                estimation_history: estimation_history,
+                userStoryFeatureName: user_stories.feature_name,
+            }).from(estimation_history)
+                .leftJoin(user_stories, eq(estimation_history.user_story_id, user_stories.id))
+                .where(and(eq(estimation_history.project_id, projectId), eq(estimation_history.is_reference, false))).orderBy(desc(estimation_history.created_at)).limit(5),
             db.select({ cost: estimation_history.cost, createdAt: estimation_history.created_at })
                 .from(estimation_history)
                 .where(and(eq(estimation_history.project_id, projectId), eq(estimation_history.is_reference, false)))
@@ -49,16 +54,25 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
         const totalTasks = estimationStatsResult[0]?.totalTasks || 0;
         const totalMandays = parseFloat(estimationStatsResult[0]?.totalMandays || '0');
         const averageMandays = totalTasks > 0 ? totalMandays / totalTasks : 0;
+        const recentHistory = recentHistoryResult.map(r => ({
+            ...r.estimation_history,
+            userStoryFeatureName: r.userStoryFeatureName,
+        }));
 
         // Process data for the trend chart
         const trendData = estimationTrendResult.reduce((acc, record) => {
-            if (record.createdAt) { // Only process records with a valid date
-                const date = new Date(record.createdAt).toISOString().split('T')[0]; // Group by day
-                const cost = parseFloat(String(record.cost) || '0');
-                if (!acc[date]) {
-                    acc[date] = 0;
+            // Ensure createdAt is not null before processing
+            if (record.createdAt) {
+                try {
+                    const date = new Date(record.createdAt).toISOString().split('T')[0]; // Group by day
+                    const cost = parseFloat(String(record.cost) || '0');
+                    if (!acc[date]) {
+                        acc[date] = 0;
+                    }
+                    acc[date] += cost;
+                } catch (e) {
+                    // Ignore records with invalid date formats
                 }
-                acc[date] += cost;
             }
             return acc;
         }, {} as Record<string, number>);
@@ -73,7 +87,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
             totalTasks,
             totalMandays: parseFloat(totalMandays.toFixed(2)),
             averageMandays: parseFloat(averageMandays.toFixed(2)),
-            recentHistory: recentHistoryResult,
+            recentHistory: recentHistory,
             estimationTrend,
         });
 

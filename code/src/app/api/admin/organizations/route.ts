@@ -13,24 +13,24 @@ if (!JWT_SECRET) {
 
 const secret = new TextEncoder().encode(JWT_SECRET);
 
-async function authorizeSuperadmin() {
+async function authorizeAdmin() {
     const cookieStore = await cookies();
     const token = cookieStore.get('auth_token')?.value;
     if (!token) return { error: 'Unauthorized', status: 401 };
 
     try {
         const { payload } = await jwtVerify(token, secret);
-        if (payload.role !== 'superadmin') {
+        if (payload.role !== 'superadmin' && payload.role !== 'admin') {
             return { error: 'Forbidden', status: 403 };
         }
         return { user: payload };
     } catch (err) {
-        return { error: 'Invalid token', status: 401 };
+        return { error: 'Invalid token', status: 401 }; // Corrected status
     }
 }
 
 export async function GET() {
-    const auth = await authorizeSuperadmin();
+    const auth = await authorizeAdmin();
     if (auth.error) {
         return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
@@ -59,7 +59,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-    const auth = await authorizeSuperadmin();
+    const auth = await authorizeAdmin();
     if (auth.error) {
         return NextResponse.json({ error: auth.error }, { status: auth.status });
     }

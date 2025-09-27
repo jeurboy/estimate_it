@@ -239,15 +239,6 @@ const HistoryPage = () => {
     return (
         <>
             <Space direction="vertical" size="large" style={{ display: 'flex' }}>
-                <Card>
-                    <Title level={2} style={{ margin: 0 }}>
-                        History for: {selectedProject ? selectedProject.name_en : 'No Project Selected'}
-                    </Title>
-                    <Paragraph type="secondary">
-                        This page shows the estimation history for the currently selected project.
-                        Please select a project from the dropdown in the header to view its history.
-                    </Paragraph>
-                </Card>
                 {error && <Alert message="Error" description={error} type="error" showIcon />}
                 <Card>
                     <Spin spinning={loading} tip="Loading history...">

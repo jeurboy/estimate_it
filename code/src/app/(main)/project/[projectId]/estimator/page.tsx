@@ -2,10 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import ResultsTable from '@/components/ResultsTable';
-import ChatLog from '@/components/ChatLog';
 import SaveToHistoryForm from '@/components/SaveToHistoryForm';
-import { Space, Typography, Spin, Alert, Input, Button, Card, Select, Row, Col, Steps, Modal, message, Tooltip, Collapse, Table } from 'antd';
-import { CheckCircleOutlined, ArrowLeftOutlined } from '@ant-design/icons';
+import { Space, Typography, Spin, Alert, Input, Button, Card, Select, Row, Col, Steps, Modal, message, Tooltip, Table, Tag, Dropdown, MenuProps } from 'antd';
+import { CheckCircleOutlined, ArrowLeftOutlined, RobotOutlined, BulbOutlined, EyeOutlined } from '@ant-design/icons';
 import { useProject } from '@/contexts/ProjectContext';
 import Link from 'next/link';
 import useEstimationPage from '@/hooks/useEstimationPage';
@@ -19,17 +18,28 @@ interface GeneratedStory {
     clientId: string; // A unique ID generated on the client
 }
 
+const GENERATED_STORIES_KEY_PREFIX = 'generated_stories_';
+const SUGGESTED_FEATURES_KEY_PREFIX = 'suggested_features_';
+
+
 export default function EstimationPage() {
     // State for the new task input field, managed locally on this page.
     const [taskDescription, setTaskDescription] = useState('');
     const [isStoryModalVisible, setIsStoryModalVisible] = useState(false);
+    const [modalContentSource, setModalContentSource] = useState<'generated' | 'suggested'>('generated');
     const [generatedStories, setGeneratedStories] = useState<GeneratedStory[]>([]);
+    const [suggestedFeatures, setSuggestedFeatures] = useState<GeneratedStory[]>([]);
     const [isGeneratingStories, setIsGeneratingStories] = useState(false);
+    const [modalTitle, setModalTitle] = useState('Generated User Stories');
+    const [isSuggestingNewFeatures, setIsSuggestingNewFeatures] = useState(false);
     const [isSavingAll, setIsSavingAll] = useState(false);
     const [savedStories, setSavedStories] = useState<UserStory[]>([]);
     const [selectedStoryKeys, setSelectedStoryKeys] = useState<React.Key[]>([]);
     const [functionName, setFunctionName] = useState('');
     const [projectHistory, setProjectHistory] = useState<EstimationHistory[]>([]);
+    const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
+    const [isFromGeneratedStory, setIsFromGeneratedStory] = useState(false);
+    const [hasStoredStories, setHasStoredStories] = useState(false);
 
     const { selectedProject } = useProject();
 
@@ -41,11 +51,22 @@ export default function EstimationPage() {
         lastPrompt,
         rawResponse,
         suggestedStory,
+        setSuggestedStory,
+        setSourceStoryId,
         handleEstimate,
         handleSaveToHistory,
         handleSubTasksChange,
         resetEstimation,
-    } = useEstimationPage();
+    } = useEstimationPage(selectedProject?.id);
+
+    useEffect(() => {
+        // Reset the flag whenever the task description changes manually
+        // Only reset the story ID if the description no longer matches any saved story
+        if (!savedStories.some(s => s.story_text === taskDescription)) {
+            setSelectedStoryId(null);
+        }
+        setIsFromGeneratedStory(false);
+    }, [taskDescription]);
 
     // This effect will pre-fill the function name for the history form
     // when the AI suggests a story after a manual estimation.
@@ -60,7 +81,21 @@ export default function EstimationPage() {
             setSavedStories([]);
             setProjectHistory([]);
             setGeneratedStories([]); // Clear generated stories when project changes
+            setSuggestedStory(null);
+            setHasStoredStories(false);
             return;
+        }
+
+        // Load generated stories from local storage on project change
+        const savedGeneratedStories = localStorage.getItem(`${GENERATED_STORIES_KEY_PREFIX}${selectedProject.id}`);
+        if (savedGeneratedStories) {
+            setGeneratedStories(JSON.parse(savedGeneratedStories));
+        }
+
+        // Load suggested features from local storage on project change
+        const savedSuggestedFeatures = localStorage.getItem(`${SUGGESTED_FEATURES_KEY_PREFIX}${selectedProject.id}`);
+        if (savedSuggestedFeatures) {
+            setSuggestedFeatures(JSON.parse(savedSuggestedFeatures));
         }
 
         const fetchProjectData = async () => {
@@ -97,6 +132,12 @@ export default function EstimationPage() {
     const handleGenerateStories = async () => {
         if (!selectedProject) return;
         setIsGeneratingStories(true);
+
+        // Clear previous generated stories from state and local storage before generating new ones
+        setGeneratedStories([]);
+        const key = `${GENERATED_STORIES_KEY_PREFIX}${selectedProject.id}`;
+        localStorage.removeItem(key);
+
         try {
             const response = await fetch('/api/generate-stories', {
                 method: 'POST',
@@ -110,6 +151,9 @@ export default function EstimationPage() {
                 ...story,
                 clientId: `${story.featureName}-${Math.random()}`
             }));
+            setModalTitle('Generated User Stories');
+            setModalContentSource('generated');
+            localStorage.setItem(key, JSON.stringify(storiesWithClientIds)); // Save to local storage
             setGeneratedStories(storiesWithClientIds);
             setIsStoryModalVisible(true);
         } catch (error: unknown) {
@@ -117,6 +161,38 @@ export default function EstimationPage() {
             message.error(`Error generating stories: ${errorMessage}`);
         } finally {
             setIsGeneratingStories(false);
+        }
+    };
+
+    const handleSuggestNewFeatures = async () => {
+        if (!selectedProject) return;
+        setIsSuggestingNewFeatures(true);
+        try {
+            const response = await fetch('/api/suggest-features', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    projectDescription: selectedProject.description,
+                    existingStories: savedStories,
+                }),
+            });
+            if (!response.ok) throw new Error('Failed to suggest new features from API.');
+            const data = await response.json();
+            const storiesWithClientIds = (data.stories || []).map((story: { featureName: string; storyText: string; }) => ({
+                ...story,
+                clientId: `${story.featureName}-${Math.random()}`
+            }));
+            setModalTitle('Suggested New Features');
+            setModalContentSource('suggested');
+            const key = `${SUGGESTED_FEATURES_KEY_PREFIX}${selectedProject.id}`;
+            localStorage.setItem(key, JSON.stringify(storiesWithClientIds)); // Save to local storage
+            setSuggestedFeatures(storiesWithClientIds);
+            setIsStoryModalVisible(true);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
+            message.error(`Error suggesting new features: ${errorMessage}`);
+        } finally {
+            setIsSuggestingNewFeatures(false);
         }
     };
 
@@ -132,6 +208,11 @@ export default function EstimationPage() {
             const newStory = await response.json();
             setSavedStories(prev => [...prev, newStory]);
             message.success('User story saved!');
+            // After saving the story, we need to find its ID and set it
+            // so that the estimation can be linked to it.
+            setSelectedStoryId(newStory.id);
+            setSourceStoryId(newStory.id); // Explicitly set the story ID for the current estimation context
+            return newStory; // Return the new story
         } catch (error: unknown) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             message.error(`Error saving story: ${errorMessage}`);
@@ -143,7 +224,7 @@ export default function EstimationPage() {
         setIsSavingAll(true);
         try {
             // Find the full story objects from the selected keys
-            const selectedStories = generatedStories.filter(story =>
+            const selectedStories = (modalContentSource === 'generated' ? generatedStories : suggestedFeatures).filter(story =>
                 selectedStoryKeys.includes(story.clientId)
             );
 
@@ -203,6 +284,22 @@ export default function EstimationPage() {
         return projectHistory.some(historyItem => historyItem.function_name === story.feature_name);
     };
 
+    const viewMenuItems: MenuProps['items'] = [];
+    if (generatedStories.length > 0) {
+        viewMenuItems.push({
+            key: 'generated',
+            label: `ดู Story ที่สร้างไว้ (${generatedStories.length})`,
+            onClick: () => { setModalContentSource('generated'); setIsStoryModalVisible(true); }
+        });
+    }
+    if (suggestedFeatures.length > 0) {
+        viewMenuItems.push({
+            key: 'suggested',
+            label: `ดู Feature ที่แนะนำ (${suggestedFeatures.length})`,
+            onClick: () => { setModalContentSource('suggested'); setIsStoryModalVisible(true); }
+        });
+    }
+
     const generatedStoriesColumns = [
         {
             title: 'Feature Name',
@@ -221,11 +318,6 @@ export default function EstimationPage() {
             width: '20%',
             render: (_: unknown, record: GeneratedStory) => (
                 <Space>
-                    <Button onClick={() => {
-                        setTaskDescription(record.storyText);
-                        setFunctionName(record.featureName);
-                        setIsStoryModalVisible(false);
-                    }}>Use</Button>
                     {isFeatureNameDuplicate(record.featureName) ? (
                         <Tooltip title="A story with this feature name already exists.">
                             <Button disabled>Saved</Button>
@@ -267,16 +359,11 @@ export default function EstimationPage() {
                     <Card
                         title={<Title level={4} style={{ margin: 0 }}>1. Project Context</Title>}
                         style={{ height: '100%' }}
-                        extra={
-                            <Space>
-                                <a href="/projects" target="_blank" rel="noopener noreferrer">Manage Project</a>
-                                <a href="/user-stories" target="_blank" rel="noopener noreferrer">Manage Stories</a>
-                            </Space>
-                        }
                     >
                         <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                            <div style={{ marginBottom: '8px' }}>
+                            <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <Text strong>Project Description</Text>
+                                <Text type="secondary">Saved Stories: {savedStories.length}</Text>
                             </div>
                             <div
                                 style={{
@@ -296,16 +383,22 @@ export default function EstimationPage() {
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <Space>
-                                    <Button onClick={handleGenerateStories} loading={isGeneratingStories} disabled={!selectedProject}>
-                                        {generatedStories.length > 0 ? 'Re-generate Stories' : 'Generate User Stories'}
-                                    </Button>
-                                    {generatedStories.length > 0 && (
-                                        <Button onClick={() => setIsStoryModalVisible(true)}>
-                                            View Generated Stories ({generatedStories.length})
+                                    <Tooltip title={generatedStories.length > 0 ? 'Re-generate Stories' : 'Generate User Stories from Project Description'}>
+                                        <Button type="primary" icon={<RobotOutlined />} onClick={handleGenerateStories} loading={isGeneratingStories} disabled={!selectedProject}>
+                                            สร้าง Story
                                         </Button>
+                                    </Tooltip>
+                                    <Tooltip title="ให้ AI แนะนำ Feature ใหม่จาก Story ที่มีอยู่">
+                                        <Button icon={<BulbOutlined />} onClick={handleSuggestNewFeatures} loading={isSuggestingNewFeatures} disabled={!selectedProject}>
+                                            แนะนำ Feature
+                                        </Button>
+                                    </Tooltip>
+                                    {viewMenuItems.length > 0 && (
+                                        <Dropdown menu={{ items: viewMenuItems }} placement="bottomRight">
+                                            <Button type="dashed" icon={<EyeOutlined />}>ดูผลลัพธ์ AI</Button>
+                                        </Dropdown>
                                     )}
                                 </Space>
-                                <Text type="secondary">Saved Stories: {savedStories.length}</Text>
                             </div>
                         </div>
                     </Card>
@@ -317,19 +410,23 @@ export default function EstimationPage() {
                             placeholder="Or select a saved user story..."
                             style={{ width: '100%', marginBottom: 16 }}
                             onChange={(value: string | undefined) => {
-                                setTaskDescription(value || ''); // Ensure value is a string
+                                const story = savedStories.find(s => s.story_text === value);
+                                setTaskDescription(value || '');
                                 if (!value) {
                                     setFunctionName(''); // Clear function name if story is cleared
+                                    setSelectedStoryId(null);
+                                } else if (story) {
+                                    setFunctionName(story.feature_name);
+                                    setSelectedStoryId(story.id);
+                                    setSourceStoryId(story.id); // Explicitly set the story ID for the current estimation context
                                 }
-                                const story = savedStories.find(s => s.story_text === value);
-                                if (story) setFunctionName(story.feature_name);
                             }}
                             optionRender={(option) => (
-                                <div style={{ backgroundColor: option.data.isEstimated ? '#f6ffed' : 'transparent' }}>
-                                    <Space>
-                                        {`[${option.data.feature_name}] ${option.label}`}
-                                        {option.data.isEstimated && <CheckCircleOutlined style={{ color: '#52c41a' }} />}
-                                    </Space>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <Text ellipsis disabled={option.data.isEstimated} style={{ flex: 1 }}>
+                                        <Text strong>[{option.data.feature_name}]</Text> {option.label}
+                                    </Text>
+                                    {option.data.isEstimated && <Tag color="success" style={{ marginLeft: 8 }}>ประเมินแล้ว</Tag>}
                                 </div>
                             )}
                             options={savedStories.map(s => ({
@@ -348,7 +445,11 @@ export default function EstimationPage() {
                                 type="primary"
                                 onClick={() => {
                                     if (selectedProject) {
-                                        handleEstimate(taskDescription, selectedProject.description, selectedProject.id, isTaskFromSavedStory());
+                                        handleEstimate(taskDescription, selectedProject.description, selectedProject.id, {
+                                            isFromSavedStory: isTaskFromSavedStory(),
+                                            isFromGeneratedStory: isFromGeneratedStory,
+                                            storyId: selectedStoryId || undefined,
+                                        });
                                     }
                                 }}
                                 loading={isLoading}
@@ -365,8 +466,13 @@ export default function EstimationPage() {
                                         <Typography.Text strong>{suggestedStory.featureName}</Typography.Text>
                                         <Typography.Paragraph>{suggestedStory.storyText}</Typography.Paragraph>
                                     </Card>
-                                    <Button type="link" style={{ padding: 0 }} onClick={() => handleSaveStory(suggestedStory)}>
-                                        + Save as a new User Story
+                                    <Button type="link" style={{ padding: 0 }} onClick={async () => {
+                                        const newStory = await handleSaveStory(suggestedStory);
+                                        if (newStory) {
+                                            // Update the task description to match the newly saved story
+                                            setTaskDescription(newStory.story_text);
+                                        }
+                                    }}>+ Save as a new User Story
                                     </Button>
                                 </Space>
                             </Card>
@@ -375,16 +481,6 @@ export default function EstimationPage() {
                 </Col>
             </Row>
 
-            {messages.length > 0 && (
-                <Collapse
-                    style={{ marginTop: 24 }}
-                    items={[{
-                        key: '1',
-                        label: 'View AI Interaction Log',
-                        children: <ChatLog messages={messages} prompt={lastPrompt} rawResponse={rawResponse} />,
-                    }]}
-                />
-            )}
             {isLoading && (
                 <Spin size="large" tip="Estimating, please wait...">
                     <div style={{ padding: '50px 0', background: 'rgba(0, 0, 0, 0.02)', borderRadius: '8px' }} />
@@ -392,21 +488,35 @@ export default function EstimationPage() {
             )}
             {!isLoading && results && (
                 <>
-                    <ResultsTable subTasks={results.subTasks} cost={results.cost} onSubTasksChange={handleSubTasksChange} />
-                    <SaveToHistoryForm functionName={functionName}
-                        onSubmit={async (savedFunctionName, isReference) => {
-                            const newHistoryRecord = await handleSaveToHistory(savedFunctionName, isReference, selectedProject?.id);
-                            if (newHistoryRecord) {
-                                // Add the new record to the local state to update the UI instantly
-                                setProjectHistory(prev => [newHistoryRecord, ...prev]);
-                                // Reset the form and results to the initial state for the next estimation
-                                resetEstimation();
-                                setTaskDescription('');
-                                setFunctionName('');
-                            }
-                        }}
-                        isLoading={isSaving}
+                    {!isTaskFromSavedStory() && (
+                        <Alert
+                            message="จำเป็นต้องดำเนินการ"
+                            description="Task นี้ถูกสร้างขึ้นเอง กรุณาบันทึกเป็น User Story ผ่านการ์ด 'AI Suggestion' ด้านบนก่อนจึงจะสามารถบันทึกผลการประเมินนี้ได้"
+                            type="warning"
+                            showIcon
+                            style={{ marginTop: 24, marginBottom: 16 }}
+                        />
+                    )}
+                    <ResultsTable
+                        subTasks={results.subTasks}
+                        cost={results.cost}
+                        onSubTasksChange={handleSubTasksChange}
                     />
+                    {isTaskFromSavedStory() && (
+                        <SaveToHistoryForm
+                            functionName={functionName}
+                            onSubmit={async (savedFunctionName, isReference) => {
+                                const newHistoryRecord = await handleSaveToHistory(savedFunctionName, isReference, selectedProject?.id);
+                                if (newHistoryRecord) {
+                                    message.success('บันทึกผลการประเมินสำเร็จ!');
+                                    resetEstimation();
+                                    setTaskDescription('');
+                                    setFunctionName('');
+                                }
+                            }}
+                            isLoading={isSaving}
+                        />
+                    )}
                 </>
             )}
             {!isLoading && !results && messages.length > 0 && !messages.some(m => m.type === 'error') && (
@@ -414,7 +524,7 @@ export default function EstimationPage() {
             )}
 
             <Modal
-                title="Generated User Stories"
+                title={modalTitle}
                 open={isStoryModalVisible}
                 onCancel={() => setIsStoryModalVisible(false)}
                 footer={[
@@ -436,7 +546,7 @@ export default function EstimationPage() {
                 <Table
                     rowSelection={rowSelection}
                     columns={generatedStoriesColumns}
-                    dataSource={generatedStories}
+                    dataSource={modalContentSource === 'generated' ? generatedStories : suggestedFeatures}
                     rowKey="clientId"
                     pagination={{ pageSize: 10 }}
                     size="small"

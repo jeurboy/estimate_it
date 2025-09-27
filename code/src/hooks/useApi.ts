@@ -1,16 +1,12 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
-import { Modal } from 'antd';
-import { useRouter } from 'next/navigation';
+import { useState, useCallback } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 
 export const useApi = () => {
-    const router = useRouter();
+    const { showSessionExpiredModal } = useAuth();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-
-    // Use useRef to persist the flag across re-renders without causing them.
-    const isModalOpenRef = useRef(false);
 
     const apiFetch = useCallback(async <T>(url: string, options?: RequestInit): Promise<T | null> => {
         setLoading(true);
@@ -18,20 +14,8 @@ export const useApi = () => {
         try {
             const response = await fetch(url, options);
 
-            if (response.status === 401 && !isModalOpenRef.current) {
-                isModalOpenRef.current = true; // Set flag to true
-                Modal.warning({
-                    title: 'Session Expired',
-                    content: 'Your session has expired. Please log in again to continue.',
-                    okText: 'Go to Login',
-                    onOk() {
-                        isModalOpenRef.current = false; // Reset flag
-                        router.push('/login');
-                    },
-                    // The modal won't be closable by clicking outside or pressing Esc
-                    maskClosable: false,
-                    keyboard: false,
-                });
+            if (response.status === 401) {
+                showSessionExpiredModal();
                 return null; // Stop further processing
             }
 
@@ -59,7 +43,7 @@ export const useApi = () => {
         } finally {
             setLoading(false);
         }
-    }, [router]);
+    }, [showSessionExpiredModal]);
 
     return { apiFetch, loading, error, setError };
 };

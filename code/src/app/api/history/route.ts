@@ -2,9 +2,24 @@ import { NextResponse } from 'next/server';
 import { getEmbedding } from '@/lib/services/embeddingService';
 import { createErrorResponse } from '@/lib/utils/normalize';
 import { saveEstimation, listEstimations } from '@/lib/db/history';
+import { cookies } from 'next/headers';
+import { jwtVerify } from 'jose';
+
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+    throw new Error('Please define the JWT_SECRET environment variable inside .env.local');
+}
+
+const secret = new TextEncoder().encode(JWT_SECRET);
 
 export async function POST(request: Request) {
     try {
+        const cookieStore = await cookies();
+        const token = cookieStore.get('auth_token')?.value;
+        if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        await jwtVerify(token, secret);
+
         const body = await request.json();
         const {
             projectId,
@@ -15,6 +30,7 @@ export async function POST(request: Request) {
             subTasks,
             cost,
             isReference,
+            userStoryId,
         } = body;
 
         // Comprehensive validation for all required fields
@@ -30,10 +46,10 @@ export async function POST(request: Request) {
         if (!Array.isArray(subTasks)) {
             return NextResponse.json({ error: 'subTasks is required and must be an array.' }, { status: 400 });
         }
-        if (typeof cost !== 'number') {
+        if (cost === undefined) {
             return NextResponse.json({ error: 'cost is required and must be a number.' }, { status: 400 });
         }
-        if (typeof isReference !== 'boolean') {
+        if (isReference === undefined) {
             return NextResponse.json({ error: 'isReference is required and must be a boolean.' }, { status: 400 });
         }
 
@@ -43,6 +59,7 @@ export async function POST(request: Request) {
         // 2. Save the complete estimation record to the database.
         const savedRecord = await saveEstimation({
             projectId,
+            userStoryId,
             sourceProjectId,
             functionName,
             featureDescription,
@@ -63,6 +80,11 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
     try {
+        const cookieStore = await cookies();
+        const token = cookieStore.get('auth_token')?.value;
+        if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        await jwtVerify(token, secret);
+
         const { searchParams } = new URL(request.url);
         const searchTerm = searchParams.get('search') || undefined;
 
